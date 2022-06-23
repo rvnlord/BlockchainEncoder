@@ -1,0 +1,3 @@
+DELETE FROM RawBlocks;
+SELECT * FROM RawBlocks;
+SELECT COUNT(*) FROM RawBlocks;

@@ -1,0 +1,200 @@
+﻿using System;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
+using CommonLib.Source.Common.Converters;
+using CommonLib.Source.Common.Utils.TypeUtils;
+using CommonLib.Wpf.Source.Common.Utils;
+using CommonLib.Wpf.Source.Common.Utils.TypeUtils;
+using MoreLinq;
+using WpfMyCompression.Source.DbContext.Models;
+using WpfMyCompression.Source.Services;
+using DataFormats = System.Windows.DataFormats;
+using DragDropEffects = System.Windows.DragDropEffects;
+using DragEventArgs = System.Windows.DragEventArgs;
+using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
+using Path = System.IO.Path;
+
+namespace WpfMyCompression.Source.Windows
+{
+    public partial class MainWindow
+    {
+        private ILitecoinManager _lm; 
+        public ILitecoinManager Lm => _lm ??= new LitecoinManager();
+
+        public MainWindow()
+        {
+            InitializeComponent();
+            Loaded += MainWindow_Loaded;
+        }
+        
+        private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (!OperatingSystem.IsWindowsVersionAtLeast(7))
+                throw new PlatformNotSupportedException();
+
+            WpfAsyncUtils.ShowLoader(gridMain);
+
+            //var myInt = 9_999_999;
+
+            //var d = myInt.ToByteArray();
+            //var d1 = d.ToInt();
+            
+            this.InitializeCommonComponents(Properties.Resources.NotifyIcon);
+            Lm.RawBlockchainSyncStatusChanged += LitecoinManager_RawBlockchainSyncStatusChanged;
+            await Lm.NotifyBlockchainSyncStatusChangedAsync();
+
+            WpfAsyncUtils.HideLoader(gridMain);
+        }
+
+        private async Task LitecoinManager_RawBlockchainSyncStatusChanged(ILitecoinManager sender, LitecoinManager.RawBlockchainSyncStatusChangedEventArgs e, CancellationToken token)
+        {
+            pbStatus.Value = e.Block == null || e.Block.Index == 0 ? 0 : (double)e.Block.Index / e.LastBlock.Index;
+            lblOperation.Content = e.ToString();
+            await Task.CompletedTask;
+        }
+
+        private async Task<(bool, string)> CompressAsync()
+        {
+            throw new NotImplementedException();
+        }
+
+        private async Task<(bool, string)> DecompressAsync()
+        {
+            throw new NotImplementedException();
+        }
+
+        private async Task<ExceptionUtils.CaughtExceptionAndData<Exception, DbRawBlock>> SyncAsync()
+        {
+            return await ExceptionUtils.CatchAsync<Exception, DbRawBlock>(async () => await Lm.SyncRawBlockchain());
+        }
+
+        private async Task<ExceptionUtils.CaughtException<Exception>> PauseAsync()
+        {
+            return await ExceptionUtils.CatchAsync<Exception>(async () => await Lm.PauseSyncingRawBlockchainAsync());
+        }
+
+        private async void BtnCompressDecompress_Click(object sender, RoutedEventArgs e)
+        {
+            btnSyncPause.IsEnabled = false;
+            btnCompressDecompress.IsEnabled = false;
+
+            if (btnCompressDecompress.Content.ToString() == "Compress")
+            {
+                var (isSuccess, message) = await CompressAsync();
+                lblOperation.Content = message;
+                if (isSuccess)
+                    btnCompressDecompress.Content = "Decompress";
+            }
+            else if (btnCompressDecompress.Content.ToString() == "Decompress")
+            {          
+                var (isSuccess, message) = await DecompressAsync();
+                lblOperation.Content = message;
+                if (isSuccess)
+                    btnCompressDecompress.Content = "Compress";
+            }
+            
+            btnCompressDecompress.IsEnabled = true;
+            btnSyncPause.IsEnabled = true;
+        }
+
+        private async void BtnSyncPause_Click(object sender, RoutedEventArgs e)
+        {
+            if (!OperatingSystem.IsWindowsVersionAtLeast(7))
+                throw new PlatformNotSupportedException();
+
+            btnCompressDecompress.IsEnabled = false;
+            
+            if (btnSyncPause.Content.ToString() == "Sync")
+            {
+                WpfAsyncUtils.ShowLoader(gridSourceFile);
+
+                btnSyncPause.Content = "Pause";
+
+                var sync = await SyncAsync();
+                if (!sync.IsSuccess)
+                {
+                    lblOperation.Content = sync.Error.Message;
+                    btnSyncPause.Content = "Sync";
+                }
+
+                WpfAsyncUtils.HideLoader(gridSourceFile);
+            }
+            else if (btnSyncPause.Content.ToString() == "Pause")
+            {
+                btnSyncPause.IsEnabled = false;
+               
+                var pause = await PauseAsync();
+                if (!pause.IsSuccess)
+                    lblOperation.Content = pause.Error.Message;
+                else
+                    btnSyncPause.Content = "Sync";
+
+                btnSyncPause.IsEnabled = true;
+            }
+            
+            btnCompressDecompress.IsEnabled = true;
+        }
+        
+        private void BtnClear_Click(object sender, RoutedEventArgs e)
+        {
+            txtSourceFile.Text = "Select or drop a file...";
+            btnCompressDecompress.IsEnabled = false;
+            btnCompressDecompress.Content = "Compress";
+        }
+
+        private void UpdateGuiForSelectedFile(string filePath)
+        {
+            var fi = new FileInfo(filePath);
+            txtSourceFile.Text = $"{fi.Name} ({fi.Length.ToFileSizeString()})";
+            
+            var extension = Path.GetExtension(filePath);
+            btnCompressDecompress.IsEnabled = true;
+            if (extension != ".lid")
+                btnCompressDecompress.Content = "Compress";
+            else
+                btnCompressDecompress.Content = "Decompress";
+        }
+        
+        private void BtnChooseSourceFile_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new OpenFileDialog
+            {
+                //DefaultExt = ".txt",
+                InitialDirectory = @"C:\"
+            };
+            
+            var result = dlg.ShowDialog();
+
+            if (!result.HasValue || !result.Value) 
+                return;
+
+            UpdateGuiForSelectedFile(dlg.FileName);
+        }
+
+        private void TxtSourceFile_Drop(object sender, DragEventArgs e)
+        {
+            if (!e.Data.GetDataPresent(DataFormats.FileDrop))
+                return;
+
+            var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+            var filePath = files?[0] ?? throw new NullReferenceException();
+            UpdateGuiForSelectedFile(filePath);
+        }
+
+        private void TxtSourceFile_DragEnter(object sender, DragEventArgs e)
+        {
+            e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.All : DragDropEffects.None;
+        }
+
+        private void TxtSourceFile_PreviewDragOver(object sender, DragEventArgs e) => e.Handled = true;
+
+        private async void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            await PauseAsync();
+        }
+    }
+}
