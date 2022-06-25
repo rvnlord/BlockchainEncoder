@@ -6,6 +6,7 @@
   xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
   xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
   xmlns:u="clr-namespace:CommonLib.Wpf.Source.Common.Utils.TypeUtils;assembly=CommonLib.Wpf"
+  xmlns:ig="http://schemas.infragistics.com/xaml"
   x:Class="WpfMyCompression.Source.Windows.MainWindow"
   mc:Ignorable="d"
   Title="Extreme Compression" 
@@ -20,7 +21,6 @@
   Closing="MainWindow_Closing" 
   SnapsToDevicePixels="True"
   mah:ControlsHelper.ContentCharacterCasing="Normal"
-  Style="{StaticResource MyCleanWindowStyle}"
   UseNoneWindowStyle="True"
   WindowStyle="None">
 
@@ -36,6 +36,10 @@
             </Grid>
         </DataTemplate>
     </mah:MetroWindow.IconTemplate>
+
+    <!--<ig:ThemeManager.Theme>
+        <ig:MetroDarkTheme StyleMicrosoftControls="true" />
+    </ig:ThemeManager.Theme>-->
 
     <Grid x:Name="gridOuter" Margin="0" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
 

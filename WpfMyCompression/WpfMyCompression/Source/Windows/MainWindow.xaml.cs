@@ -22,7 +22,8 @@ namespace WpfMyCompression.Source.Windows
 {
     public partial class MainWindow
     {
-        private ILitecoinManager _lm; 
+        private ILitecoinManager _lm;
+        private string _sourceFIle;
         public ILitecoinManager Lm => _lm ??= new LitecoinManager();
 
         public MainWindow()
@@ -57,12 +58,12 @@ namespace WpfMyCompression.Source.Windows
             await Task.CompletedTask;
         }
 
-        private async Task<(bool, string)> CompressAsync()
+        private async Task<ExceptionUtils.CaughtException<Exception>> CompressAsync()
         {
-            throw new NotImplementedException();
+            return await ExceptionUtils.CatchAsync<Exception>(async () => await new CompressionEngine().Compress(_sourceFIle));
         }
 
-        private async Task<(bool, string)> DecompressAsync()
+        private async Task<ExceptionUtils.CaughtException<Exception>> DecompressAsync()
         {
             throw new NotImplementedException();
         }
@@ -84,17 +85,24 @@ namespace WpfMyCompression.Source.Windows
 
             if (btnCompressDecompress.Content.ToString() == "Compress")
             {
-                var (isSuccess, message) = await CompressAsync();
-                lblOperation.Content = message;
-                if (isSuccess)
-                    btnCompressDecompress.Content = "Decompress";
+                if (!File.Exists(_sourceFIle))
+                    lblOperation.Content = "File doesn't exist";
+                else
+                {
+                    var compress = await CompressAsync();
+                    if (compress.IsSuccess)
+                        btnCompressDecompress.Content = "Decompress";
+                    else
+                        lblOperation.Content = compress.Error.Message;
+                }
             }
             else if (btnCompressDecompress.Content.ToString() == "Decompress")
             {          
-                var (isSuccess, message) = await DecompressAsync();
-                lblOperation.Content = message;
-                if (isSuccess)
+                var decompress = await DecompressAsync();
+                if (decompress.IsSuccess)
                     btnCompressDecompress.Content = "Compress";
+                else
+                    lblOperation.Content = decompress.Error.Message;
             }
             
             btnCompressDecompress.IsEnabled = true;
@@ -150,7 +158,8 @@ namespace WpfMyCompression.Source.Windows
         {
             var fi = new FileInfo(filePath);
             txtSourceFile.Text = $"{fi.Name} ({fi.Length.ToFileSizeString()})";
-            
+            _sourceFIle = fi.FullName;
+
             var extension = Path.GetExtension(filePath);
             btnCompressDecompress.IsEnabled = true;
             if (extension != ".lid")

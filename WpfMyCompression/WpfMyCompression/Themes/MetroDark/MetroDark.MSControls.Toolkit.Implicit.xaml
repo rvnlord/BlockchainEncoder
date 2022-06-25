@@ -12,7 +12,7 @@
 
 	<!-- *********************************  RESOURCES  ********************************* -->
 	<ResourceDictionary.MergedDictionaries>
-		<ResourceDictionary Source="Styles.WPF.xaml" />
+		<ResourceDictionary Source="MetroDark.Styles.xaml" />
 	</ResourceDictionary.MergedDictionaries>
 
 	<!-- *********************************  BRUSHES  ********************************* -->

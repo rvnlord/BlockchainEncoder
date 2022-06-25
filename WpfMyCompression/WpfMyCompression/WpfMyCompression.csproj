@@ -28,12 +28,10 @@
     <Resource Include="Icon.ico" />
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="Themes\MetroDark\HowToApplyTheme.txt" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Infragistics.Themes.MetroDark.Wpf" Version="1.0.0" />
-    <PackageReference Include="Infragistics.WPF" Version="19.1.84" />
-    <PackageReference Include="Infragistics.WPF.Themes.MetroDark" Version="19.1.84" />
+    <PackageReference Include="Infragistics.WPF" Version="22.1.40" />
+    <PackageReference Include="Infragistics.WPF.Editors" Version="22.1.40" />
+    <PackageReference Include="Infragistics.WPF.Gauges" Version="22.1.40" />
+    <PackageReference Include="Infragistics.WPF.Themes.MetroDark" Version="22.1.40" />
     <PackageReference Include="MahApps.Metro.IconPacks.Modern" Version="4.11.0" />
     <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="6.0.1" />
@@ -84,5 +82,16 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\CommonLib.Wpf\CommonLib.Wpf\CommonLib.Wpf\CommonLib.Wpf.csproj" />
     <ProjectReference Include="..\..\..\CryptoApisLib\CryptoApisLib\CryptoApisLib\CryptoApisLib.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Windows.Controls.Input.Toolkit">
+      <HintPath>E:\Program Files\Infragistics\Utils\System.Windows.Controls.Input.Toolkit.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Windows.Controls.Layout.Toolkit">
+      <HintPath>E:\Program Files\Infragistics\Utils\System.Windows.Controls.Layout.Toolkit.dll</HintPath>
+    </Reference>
+    <Reference Include="WPFToolkit">
+      <HintPath>E:\Program Files\Infragistics\Utils\WPFToolkit.dll</HintPath>
+    </Reference>
   </ItemGroup>
 </Project>

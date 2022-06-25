@@ -11,9 +11,11 @@
 
     <!--#region Window-->
 
+    <SolidColorBrush x:Key="WhiteBrush" Color="White" />
     <SolidColorBrush x:Key="MouseOverTitleBarBrush" Color="#FF000040" />
     <SolidColorBrush x:Key="DefaultWindowBrush" Color="#FF1E1E1E" />
     <SolidColorBrush x:Key="DefaultForegroundBrush" Color="#FFBABABA" />
+    <SolidColorBrush x:Key="TransparentBrush" Color="#00FFFFFF" />
 
     <LinearGradientBrush x:Key="pbBackgroundBrush" StartPoint="0,0" EndPoint="0,1">
         <GradientStop Color="#323232" Offset="0.0" />
@@ -26,11 +28,13 @@
     </LinearGradientBrush>
 
     <Style x:Key="MyCleanWindowStyle" 
-           TargetType="{x:Type mah:MetroWindow}" 
-           BasedOn="{StaticResource MahApps.Styles.MetroWindow.Clean}">
+           TargetType="{x:Type mah:MetroWindow}" BasedOn="{StaticResource {x:Type Window}}" >
+        <Setter Property="NonActiveWindowTitleBrush" Value="{DynamicResource MahApps.Brushes.Transparent}" />
+        <Setter Property="TitleForeground" Value="{DynamicResource MahApps.Brushes.ThemeForeground}" />
+
         <Setter Property="TitleCharacterCasing" Value="Normal"/>
         <Setter Property="IconEdgeMode" Value="Aliased"/>
-        <Setter Property="TitleAlignment" Value="-10,0,0,0"/>
+        <Setter Property="TitleAlignment" Value="Left"/>
         <Setter Property="FontSize" Value="12" />
         <Setter Property="WindowTitleBrush" Value="{StaticResource MouseOverTitleBarBrush}"></Setter>
         <Setter Property="Foreground" Value="White"></Setter>
@@ -80,7 +84,7 @@
                 <Setter Property="Background" Value="{StaticResource RowSelectedBrush}" />
             </MultiTrigger>
             <Trigger Property="IsEnabled" Value="False">
-                <Setter Property="Foreground" Value="{StaticResource MahApps.Brushes.ThemeBackground}" />
+                <Setter Property="Foreground" Value="{StaticResource WhiteBrush}" />
             </Trigger>
         </Style.Triggers>
     </Style>
@@ -150,10 +154,9 @@
         <Setter Property="RowHeight" Value="25" />
         <Setter Property="RowBackground" Value="{StaticResource RowBrush}" />
         <Setter Property="RowStyle" Value="{StaticResource MyRowStyle}" />
-        <Setter Property="DataGridTextColumn.HeaderStyle" Value="{StaticResource MyDataGridColumnHeaderStyle}"></Setter>
     </Style>
 
-    <Style x:Key="CenterAlignedCellStyle" BasedOn="{StaticResource MetroDataGridCell}" TargetType="{x:Type DataGridCell}">
+    <Style x:Key="CenterAlignedCellStyle" BasedOn="{StaticResource MahApps.Styles.DataGridCell}" TargetType="{x:Type DataGridCell}">
         <Style.Setters>
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Foreground" Value="White" />
@@ -642,5 +645,75 @@
     </Style>
 
     <!-- #endregion -->
+
+        <!--#region xamRadialGauge-->
+
+    <Style TargetType="{x:Type ig:XamRadialGauge}" BasedOn="{StaticResource {x:Type ig:XamRadialGauge}}">
+        <Setter Property="Value" Value="75" />
+        <Setter Property="BackingOutline" Value="Blue"></Setter>
+        <Setter Property="BackingStrokeThickness" Value="2"></Setter>
+        <Setter Property="NeedleEndExtent" Value="0.55"></Setter>
+        <Setter Property="MinorTickStartExtent" Value="0.6"></Setter>
+        <Setter Property="MinorTickEndExtent" Value="0.62"></Setter>
+        <Setter Property="TickStartExtent" Value="0.6"></Setter>
+        <Setter Property="TickEndExtent" Value="0.65"></Setter>
+        <Setter Property="LabelExtent" Value="0.8"></Setter>
+        <Setter Property="BackingOuterExtent" Value="0.99"></Setter>
+        <Setter Property="HorizontalAlignment" Value="Left"></Setter>
+        <Setter Property="VerticalAlignment" Value="Top"></Setter>
+        <Setter Property="Height" Value="150"></Setter>
+        <Setter Property="Width" Value="150"></Setter>
+        <Setter Property="ScaleStartExtent" Value="0"></Setter>
+        <Setter Property="ScaleEndExtent" Value="0"></Setter>
+    </Style>
+
+    <!--#endregion-->
+
+    <!--#region XamNumericEditor-->
+
+    <Style TargetType="{x:Type ige:XamNumericEditor}" BasedOn="{StaticResource {x:Type ige:XamNumericEditor}}">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="ContextMenu" Value="{StaticResource emptyContextMenu}" />
+        <Setter Property="Height" Value="30" />
+        <Setter Property="Width" Value="120" />
+        <Setter Property="HorizontalAlignment" Value="Left"></Setter>
+        <Setter Property="VerticalAlignment" Value="Top"></Setter>
+        <Setter Property="Mask" Value="{}nnnn"></Setter>
+        <Setter Property="InvalidValueBehavior" Value="Default"></Setter>
+    </Style>
+
+    <!--#endregion-->
+
+    <!--#region XamCurrencyEditor-->
+
+    <Style TargetType="{x:Type ige:XamCurrencyEditor}" BasedOn="{StaticResource {x:Type ige:XamCurrencyEditor}}">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="ContextMenu" Value="{StaticResource emptyContextMenu}" />
+        <Setter Property="Height" Value="30" />
+        <Setter Property="Width" Value="120" />
+        <Setter Property="HorizontalAlignment" Value="Left"></Setter>
+        <Setter Property="VerticalAlignment" Value="Top"></Setter>
+        <Setter Property="Mask" Value="{}nnnn.nnnnnnnn EX\C"></Setter>
+        <Setter Property="InvalidValueBehavior" Value="Default"></Setter>
+    </Style>
+
+    <!--#endregion-->
+
+    <!--#region XamDateTimeEditor-->
+
+    <Style TargetType="{x:Type ige:XamDateTimeEditor}" BasedOn="{StaticResource {x:Type ige:XamDateTimeEditor}}">
+        <Setter Property="DataMode" Value="IncludeBoth" />
+        <Setter Property="Mask" Value="{}dd\-mm\-yyyy" />
+        <Setter Property="Format" Value="{}dd-MM-yyyy" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Padding" Value="3,3" />
+        <Setter Property="ContextMenu" Value="{StaticResource emptyContextMenu}" />
+        <Setter Property="Height" Value="30" />
+        <Setter Property="Width" Value="120" />
+        <Setter Property="HorizontalAlignment" Value="Left"></Setter>
+        <Setter Property="VerticalAlignment" Value="Top"></Setter>
+    </Style>
+
+    <!--#endregion-->
 
 </ResourceDictionary>
