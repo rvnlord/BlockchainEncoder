@@ -22,6 +22,9 @@ namespace WpfMyCompression.Migrations
                     b.Property<long>("Index")
                         .HasColumnType("INTEGER");
 
+                    b.Property<byte[]>("ExpandedBlockHash")
+                        .HasColumnType("BLOB");
+
                     b.Property<byte[]>("RawData")
                         .HasColumnType("BLOB");
 

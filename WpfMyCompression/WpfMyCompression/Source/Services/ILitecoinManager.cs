@@ -18,7 +18,9 @@ namespace WpfMyCompression.Source.Services
         Task PauseSyncingRawBlockchainAsync();
         Task NotifyBlockchainSyncStatusChangedAsync();
         Task<int> GetBlockCountAsync();
-        Task<DbRawBlock> GetBlockFromDbByIndex(int index);
+        Task<DbRawBlock> GetBlockFromDbByIndexAsync(int index);
+        Task<byte[]> GetExpandedBlockHashFromDbByindexAsync(int index);
+        Task<byte[]> AddExpandedBlockHashToDbByIndexAsync(int index, byte[] blockHash);
 
         event MyAsyncEventHandler<ILitecoinManager, LitecoinManager.RawBlockchainSyncStatusChangedEventArgs> RawBlockchainSyncStatusChanged;
         

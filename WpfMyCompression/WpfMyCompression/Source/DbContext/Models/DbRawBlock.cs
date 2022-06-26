@@ -4,5 +4,6 @@
     {
         public long Index { get; set; }  
         public byte[] RawData { get; set; }
+        public byte[] ExpandedBlockHash { get; set; }
     }
 }

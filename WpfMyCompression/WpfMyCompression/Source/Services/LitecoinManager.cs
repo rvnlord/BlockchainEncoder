@@ -147,8 +147,17 @@ namespace WpfMyCompression.Source.Services
 
         public async Task<int> GetBlockCountAsync() => await Db.RawBlocks.CountAsync();
 
-        public async Task<DbRawBlock> GetBlockFromDbByIndex(int index) => await Db.RawBlocks.SingleAsync(b => b.Index == index);
+        public async Task<DbRawBlock> GetBlockFromDbByIndexAsync(int index) => await Db.RawBlocks.SingleOrDefaultAsync(b => b.Index == index);
 
+        public async Task<byte[]> GetExpandedBlockHashFromDbByindexAsync(int index) => (await GetBlockFromDbByIndexAsync(index))?.ExpandedBlockHash;
+
+        public async Task<byte[]> AddExpandedBlockHashToDbByIndexAsync(int index, byte[] blockHash)
+        {
+            Db.RawBlocks.Single(b => b.Index == index).ExpandedBlockHash = blockHash;
+            await Db.SaveChangesAsync();
+            return blockHash;
+        }
+        
         public event MyAsyncEventHandler<ILitecoinManager, RawBlockchainSyncStatusChangedEventArgs> RawBlockchainSyncStatusChanged;
 
         private async Task OnRawBlockchainSyncStatusChangingAsync(RawBlockchainSyncStatusChangedEventArgs e) => await RawBlockchainSyncStatusChanged.InvokeAsync(this, e);

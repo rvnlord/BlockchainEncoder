@@ -4,9 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using CommonLib.Source.Common.Converters;
-using CommonLib.Source.Common.Extensions.Collections;
 using CommonLib.Source.Common.Utils.TypeUtils;
-using CommonLib.Source.Common.Utils.UtilClasses;
 using CommonLib.Wpf.Source.Common.Utils;
 using CommonLib.Wpf.Source.Common.Utils.TypeUtils;
 using WpfMyCompression.Source.DbContext.Models;
@@ -39,6 +37,17 @@ namespace WpfMyCompression.Source.Windows
             if (!OperatingSystem.IsWindowsVersionAtLeast(7))
                 throw new PlatformNotSupportedException();
 
+            //var t = BitUtils.MaxNumberStoredForBits(8);
+            //var t2 = BitUtils.MaxNumberStoredForBits(13);
+
+            //var bitArrs = new List<string>();
+            //for (var i = 0; i < 6500; i++)
+            //    bitArrs.Add(i.ToBitArrayString());
+
+            //bitArrs.Reverse();
+
+            //var bits = 6500.ToBitArrayString();
+
             WpfAsyncUtils.ShowLoader(gridMain);
             
             this.InitializeCommonComponents(Properties.Resources.NotifyIcon);
@@ -59,7 +68,7 @@ namespace WpfMyCompression.Source.Windows
 
         private async Task CompressionEngine_CompressionStatusChanged(CompressionEngine sender, CompressionEngine.CompressionStatusChangedEventArgs e, CancellationToken token)
         {
-            pbStatus.Value = (double)e.FileOffset / e.FileSize * 100;
+            pbStatus.Value = e.FileOffset == 0 || e.FileSize == 0 ? 0 : (double)e.FileOffset / e.FileSize * 100;
             lblOperation.Content = e.ToString();
             await Task.CompletedTask;
         }
@@ -88,6 +97,7 @@ namespace WpfMyCompression.Source.Windows
         {
             btnSyncPause.IsEnabled = false;
             btnCompressDecompress.IsEnabled = false;
+            btnClear.IsEnabled = false;
 
             if (btnCompressDecompress.Content.ToString() == "Compress")
             {
@@ -112,6 +122,7 @@ namespace WpfMyCompression.Source.Windows
                     lblOperation.Content = decompress.Error.Message;
             }
             
+            btnClear.IsEnabled = true;
             btnCompressDecompress.IsEnabled = true;
             btnSyncPause.IsEnabled = true;
         }
@@ -127,6 +138,7 @@ namespace WpfMyCompression.Source.Windows
             {
                 WpfAsyncUtils.ShowLoader(gridSourceFile);
 
+                lblOperation.Content = "Syncing...";
                 btnSyncPause.Content = "Pause";
 
                 var sync = await SyncAsync();
