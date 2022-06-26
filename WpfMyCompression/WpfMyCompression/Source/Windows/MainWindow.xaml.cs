@@ -1,15 +1,14 @@
 ﻿using System;
 using System.IO;
-using System.Linq;
-using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using CommonLib.Source.Common.Converters;
+using CommonLib.Source.Common.Extensions.Collections;
 using CommonLib.Source.Common.Utils.TypeUtils;
+using CommonLib.Source.Common.Utils.UtilClasses;
 using CommonLib.Wpf.Source.Common.Utils;
 using CommonLib.Wpf.Source.Common.Utils.TypeUtils;
-using MoreLinq;
 using WpfMyCompression.Source.DbContext.Models;
 using WpfMyCompression.Source.Services;
 using DataFormats = System.Windows.DataFormats;
@@ -23,8 +22,11 @@ namespace WpfMyCompression.Source.Windows
     public partial class MainWindow
     {
         private ILitecoinManager _lm;
+        private CompressionEngine _ce;
         private string _sourceFIle;
+
         public ILitecoinManager Lm => _lm ??= new LitecoinManager();
+        public CompressionEngine Ce => _ce ??= new CompressionEngine();
 
         public MainWindow()
         {
@@ -38,29 +40,33 @@ namespace WpfMyCompression.Source.Windows
                 throw new PlatformNotSupportedException();
 
             WpfAsyncUtils.ShowLoader(gridMain);
-
-            //var myInt = 9_999_999;
-
-            //var d = myInt.ToByteArray();
-            //var d1 = d.ToInt();
             
             this.InitializeCommonComponents(Properties.Resources.NotifyIcon);
             Lm.RawBlockchainSyncStatusChanged += LitecoinManager_RawBlockchainSyncStatusChanged;
             await Lm.NotifyBlockchainSyncStatusChangedAsync();
+
+            Ce.CompressionStatusChanged += CompressionEngine_CompressionStatusChanged;
 
             WpfAsyncUtils.HideLoader(gridMain);
         }
 
         private async Task LitecoinManager_RawBlockchainSyncStatusChanged(ILitecoinManager sender, LitecoinManager.RawBlockchainSyncStatusChangedEventArgs e, CancellationToken token)
         {
-            pbStatus.Value = e.Block == null || e.Block.Index == 0 ? 0 : (double)e.Block.Index / e.LastBlock.Index;
+            pbStatus.Value = e.Block == null || e.Block.Index == 0 ? 0 : (double)e.Block.Index / e.LastBlock.Index * 100;
+            lblOperation.Content = e.ToString();
+            await Task.CompletedTask;
+        }
+
+        private async Task CompressionEngine_CompressionStatusChanged(CompressionEngine sender, CompressionEngine.CompressionStatusChangedEventArgs e, CancellationToken token)
+        {
+            pbStatus.Value = (double)e.FileOffset / e.FileSize * 100;
             lblOperation.Content = e.ToString();
             await Task.CompletedTask;
         }
 
         private async Task<ExceptionUtils.CaughtException<Exception>> CompressAsync()
         {
-            return await ExceptionUtils.CatchAsync<Exception>(async () => await new CompressionEngine().Compress(_sourceFIle));
+            return await ExceptionUtils.CatchAsync<Exception>(async () => await Ce.CompressAsync(_sourceFIle));
         }
 
         private async Task<ExceptionUtils.CaughtException<Exception>> DecompressAsync()
@@ -89,6 +95,7 @@ namespace WpfMyCompression.Source.Windows
                     lblOperation.Content = "File doesn't exist";
                 else
                 {
+                    lblOperation.Content = "Compressing...";
                     var compress = await CompressAsync();
                     if (compress.IsSuccess)
                         btnCompressDecompress.Content = "Decompress";

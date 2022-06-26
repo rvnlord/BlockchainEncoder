@@ -12,13 +12,15 @@ namespace WpfMyCompression.Source.Services
 
         Task<RawBlock> GetNextRawBlockAsync(DbRawBlock previousBlock);
         Task<RawBlock> GetLastRawBlockAsync();
-        Task<DbRawBlock> GetLastRawBlockFromDbOrCacheOrNullAsync();
         Task<DbRawBlock> AddRawBlockAsync(DbRawBlock block);
         Task<DbRawBlock> AddNextRawBlockAsync();
         Task<DbRawBlock> SyncRawBlockchain();
         Task PauseSyncingRawBlockchainAsync();
         Task NotifyBlockchainSyncStatusChangedAsync();
+        Task<int> GetBlockCountAsync();
+        Task<DbRawBlock> GetBlockFromDbByIndex(int index);
 
         event MyAsyncEventHandler<ILitecoinManager, LitecoinManager.RawBlockchainSyncStatusChangedEventArgs> RawBlockchainSyncStatusChanged;
+        
     }
 }

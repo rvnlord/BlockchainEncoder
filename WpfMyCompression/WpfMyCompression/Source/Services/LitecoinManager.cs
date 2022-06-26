@@ -80,7 +80,7 @@ namespace WpfMyCompression.Source.Services
             return new RawBlock { Index = lastBlockHeight, RawData = resp.ResultString.HexToByteArray() };
         }
 
-        public async Task<DbRawBlock> GetLastRawBlockFromDbOrCacheOrNullAsync()
+        private async Task<DbRawBlock> GetLastRawBlockFromDbOrCacheOrNullAsync()
         {
             var lastDbIndex = !Db.RawBlocks.Any() ? (long?)null : await Db.RawBlocks.MaxAsync(b => b.Index);
             var lastCachedIndex = _rawBlocksToAdd.MaxBy(b => b.Index)?.Index;
@@ -144,6 +144,10 @@ namespace WpfMyCompression.Source.Services
             _pauseBlockchainSync = true;
             await TaskUtils.WaitUntil(() => _isBlockchainSyncPaused);
         }
+
+        public async Task<int> GetBlockCountAsync() => await Db.RawBlocks.CountAsync();
+
+        public async Task<DbRawBlock> GetBlockFromDbByIndex(int index) => await Db.RawBlocks.SingleAsync(b => b.Index == index);
 
         public event MyAsyncEventHandler<ILitecoinManager, RawBlockchainSyncStatusChangedEventArgs> RawBlockchainSyncStatusChanged;
 
