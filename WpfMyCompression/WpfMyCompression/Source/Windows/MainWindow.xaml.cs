@@ -24,7 +24,7 @@ namespace WpfMyCompression.Source.Windows
         private string _sourceFIle;
 
         public ILitecoinManager Lm => _lm ??= new LitecoinManager();
-        public CompressionEngine Ce => _ce ??= new CompressionEngine();
+        public CompressionEngine Ce => _ce ??= new CompressionEngine(1);
 
         public MainWindow()
         {
@@ -80,7 +80,7 @@ namespace WpfMyCompression.Source.Windows
 
         private async Task<ExceptionUtils.CaughtException<Exception>> DecompressAsync()
         {
-            throw new NotImplementedException();
+            return await ExceptionUtils.CatchAsync<Exception>(async () => await Ce.DecompressAsync(_sourceFIle));
         }
 
         private async Task<ExceptionUtils.CaughtExceptionAndData<Exception, DbRawBlock>> SyncAsync()

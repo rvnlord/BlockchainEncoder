@@ -157,7 +157,13 @@ namespace WpfMyCompression.Source.Services
             await Db.SaveChangesAsync();
             return blockHash;
         }
-        
+
+        public async Task<DbRawBlock[]> GetBlocksWithInvalidExpandedHashesAsync()
+        {
+            var maxSize = BitUtils.MaxNumberStoredForBits(12) + 1;
+            return await (await Db.RawBlocks.WhereAsync(b => b.ExpandedBlockHash == null || b.ExpandedBlockHash.Length < maxSize)).ToArrayAsync();
+        }
+
         public event MyAsyncEventHandler<ILitecoinManager, RawBlockchainSyncStatusChangedEventArgs> RawBlockchainSyncStatusChanged;
 
         private async Task OnRawBlockchainSyncStatusChangingAsync(RawBlockchainSyncStatusChangedEventArgs e) => await RawBlockchainSyncStatusChanged.InvokeAsync(this, e);

@@ -20,21 +20,21 @@ namespace WpfMyCompression.Source.Services
 
         public ILitecoinManager Lm => _lm ??= new LitecoinManager();
         public int ChunkSize { get; }
+        public int MaxLayers { get; }
 
-        public CompressionEngine(int chunkSize = 8)
+        public CompressionEngine(int maxLayers = 0, int chunkSize = 8)
         {
             ChunkSize = chunkSize;
+            MaxLayers = maxLayers;
         }
 
-        public async Task<byte[]> CompressAsync(string filePath)
+        public async Task CompressAsync(string filePath)
         {
             var currentMapSize = long.MaxValue;
             long previousMapSize;
             var layer = 0;
-            string mapFilePath;
             var fileSize = new FileInfo(filePath).Length;
             var maxForBits = BitUtils.MaxNumberStoredForBits(12);
-            var originalFilePath = filePath;
 
             await OnCompressionStatusChangingAsync("Removing files");
             RemoveCompressedFiles(filePath);
@@ -44,64 +44,55 @@ namespace WpfMyCompression.Source.Services
 
             do
             {
-                mapFilePath = await CompressLayerAsync(filePath, layer++, fileSize);
+                var mapFilePath = GetLayerFilePath(filePath, ++layer);
+                await CompressLayerAsync(filePath, layer, fileSize);
 
                 previousMapSize = currentMapSize;
                 currentMapSize = new FileInfo(mapFilePath).Length;
-
-                filePath = mapFilePath;
             } 
-            while (currentMapSize < previousMapSize);
+            while (currentMapSize < previousMapSize && (MaxLayers == 0 || layer < MaxLayers));
             
-            PostProcessLayerFiles(originalFilePath, layer - 1);
+            PostProcessLayerFilesAfterCompression(filePath, layer - 1);
 
             await OnCompressionStatusChangingAsync(fileSize, fileSize, layer - 1, "Compressed");
-
-            return await File.ReadAllBytesAsync(mapFilePath); // last mapPath can be loaded because file size shouldn't be big
         }
 
-        private async Task<string> CompressLayerAsync(string filePath, int layer, long fileSize)
+        private async Task CompressLayerAsync(string filePath, int layer, long fileSize)
         {
             byte[] chunk;
             long offset = 0;
-            string mapFilePath;
 
             do
             {
                 await OnCompressionStatusChangingAsync(offset, fileSize, layer, "Compressing");
+                
+                var previousMapFilePath = GetLayerFilePath(filePath, layer);
 
-                chunk = await FileUtils.ReadBytesAsync(filePath, offset, ChunkSize);
-              
-                //var match = await FindLongestMatchAsync(chunk);
-                //offset += match.ChunkLength; // `ChunkSize` would always give the initial size, `chunk.Length` would give initial size - 64 or truncated to the end of file, `match.ChunkLength` will always give the size truncated to the size to the actual match
+                chunk = await FileUtils.ReadBytesAsync(layer == 1 ? filePath : previousMapFilePath, offset, ChunkSize);
                 var matches = await FindBestMatchesAsync(chunk);
-                
-                //mapFilePath = await SaveToFileAsync(filePath, match, layer);
-                mapFilePath = await SaveToFileAsync(filePath, matches, layer, chunk);
-                
+
+                await SaveToFileAsync(filePath, layer, matches);
+
                 offset += matches?.Sum(m => m.ChunkLength) ?? ChunkSize;
             } 
             while (chunk.Length > 0);
 
-            await PostProcessFlagsFileAsync(filePath, layer);
-           
+            await PostProcessFlagsFileAfterCompressionAsync(filePath, layer);
             await OnCompressionStatusChangingAsync(fileSize, fileSize, layer, $"L{layer} Compressed");
-
-            return mapFilePath;
         }
 
-        private static async Task PostProcessFlagsFileAsync(string filePath, int layer)
+        private static async Task PostProcessFlagsFileAfterCompressionAsync(string filePath, int layer)
         {
             if (layer > 255)
-                throw new ArgumentOutOfRangeException(null, @"Layer has to be lower than byte");
+                throw new ArgumentOutOfRangeException(null, @"Layer number has to be smaller than byte");
 
-            var flagsFilePath = PathUtils.Combine(PathSeparator.BSlash, Path.GetDirectoryName(filePath), $"{new FileInfo(filePath).Name.BeforeLastOrWhole(".").BeforeLastOrWhole(".L")}.L{layer}.lid.flags");
+            var flagsFilePath = GetFlagsFilePath(filePath, layer);
             var flagsStr = await File.ReadAllTextAsync(flagsFilePath);
             var flagsBytes = flagsStr.BitArrayStringToBitArray().ToByteArray();
             await File.WriteAllBytesAsync(flagsFilePath, flagsBytes.Append_((byte)layer).ToArray());
         }
 
-        private void PostProcessLayerFiles(string originalFilePath, int layer)
+        private static void PostProcessLayerFilesAfterCompression(string originalFilePath, int layer)
         {
             var dir = new DirectoryInfo(Path.GetDirectoryName(originalFilePath) ?? throw new NullReferenceException());
             var fileName = new FileInfo(originalFilePath).Name.BeforeLastOrWhole(".");
@@ -109,7 +100,7 @@ namespace WpfMyCompression.Source.Services
             var fileExcludingCurrentLayer = compressedFiles.Where(f => !f.Name.Between(".L", ".").Equals(layer.ToString())).ToArray();
             var currentLayerFiles = compressedFiles.Except(fileExcludingCurrentLayer).ToArray();
 
-            foreach (var file in fileExcludingCurrentLayer) 
+            foreach (var file in fileExcludingCurrentLayer.Where(f => !f.Name.EndsWithInvariant(".flags"))) 
                 file.Delete();
 
             foreach (var file in currentLayerFiles) 
@@ -149,53 +140,9 @@ namespace WpfMyCompression.Source.Services
 
             return bestMatches.Count >= 4 ? bestMatches : throw new ArgumentOutOfRangeException(null, @"Can't find 3, 2 byte batches in a single block");
         }
-
-        //private async Task<RawBlockchainMatch> FindLongestMatchAsync(byte[] chunk)
-        //{
-        //    var blockCount = await Lm.GetBlockCountAsync();
-        //    var longestMatch = new RawBlockchainMatch();
-
-        //    for (var i = 0; i < blockCount; i++)
-        //    {
-        //        var block = await Lm.GetBlockFromDbByIndex(i);
-        //        var truncatedChunk = new List<byte>(chunk);
-        //        var blockOffset = -1;
-        //        var blockWithEntropy = block.RawData; //.Sha3(); // block.RawData.EncryptCamellia(block.RawData.Sha3());
-        //        while (truncatedChunk.Count > 0 && (blockOffset = await blockWithEntropy.IndexOfAsync(truncatedChunk)) == -1)
-        //            truncatedChunk.RemoveLast();
-
-        //        if (longestMatch.ChunkLength >= truncatedChunk.Count) 
-        //            continue;
-
-        //        longestMatch.BlockNumber = i;
-        //        longestMatch.BlockOffset = blockOffset;
-        //        longestMatch.ChunkLength = truncatedChunk.Count;
-        //    }
-
-        //    return longestMatch;
-        //}
-
-        //private static async Task<string> SaveToFileAsync(string filePath, RawBlockchainMatch match, int layer)
-        //{
-        //    var dir = Path.GetDirectoryName(filePath);
-        //    var fileName = new FileInfo(filePath).Name.BeforeLastOrWhole(".");
-        //    var mapFilePath = PathUtils.Combine(PathSeparator.BSlash, dir, $"{fileName}.L{layer}.lid");
-
-        //    var bytesBlockNo = match.BlockNumber.ToByteArray().Take(3).ToArray();
-        //    var bytesBlockOffset = match.BlockOffset.ToByteArray().Take(2).ToArray();
-        //    var bytesChunkLength = match.ChunkLength.ToByteArray().Take(1).ToArray();
-
-        //    await FileUtils.AppendAllBytesAsync(mapFilePath, bytesBlockNo.ConcatMany(bytesBlockOffset, bytesChunkLength).ToArray());
-        //    return mapFilePath;
-        //}
-
-        private static async Task<string> SaveToFileAsync(string filePath, List<RawBlockchainMatch> matches, int layer, byte[] chunk)
+        
+        private static async Task SaveToFileAsync(string filePath, int layer, List<RawBlockchainMatch> matches)
         {
-            var dir = Path.GetDirectoryName(filePath);
-            var fileName = new FileInfo(filePath).Name.BeforeLastOrWhole(".").BeforeLastOrWhole(".L");
-            var mapFilePath = PathUtils.Combine(PathSeparator.BSlash, dir, $"{fileName}.L{layer}.lid");
-            var flagsFilePath = PathUtils.Combine(PathSeparator.BSlash, dir, $"{fileName}.L{layer}.lid.flags");
-            
             if (!matches.Select(m => m.BlockNumber).AllEqual() && matches.Any(m => m.BlockNumber > 255))
                 throw new ArgumentOutOfRangeException(null, @"Invalid BLock number, it has to fit into a byte");
             if (matches.Any(m => m.ChunkLength != 2))
@@ -216,11 +163,11 @@ namespace WpfMyCompression.Source.Services
             var ba = new BitArray(blockNo.ConcatMany(offsets[0], offsets[1], offsets[2], offsets[3]).ToArray());
             var encoded = ba.ToByteArray();
 
+            var mapFilePath = GetLayerFilePath(filePath, layer);
             await FileUtils.AppendAllBytesAsync(mapFilePath, encoded);
 
+            var flagsFilePath = GetFlagsFilePath(filePath, layer);
             await File.AppendAllTextAsync(flagsFilePath, (encoded.Length == 7 ? 1 : 0).ToString()); // if match found in first 256 block then we got compression
-
-            return mapFilePath;
         }
 
         private static void RemoveCompressedFiles(string filePath)
@@ -235,32 +182,149 @@ namespace WpfMyCompression.Source.Services
 
         private async Task CreateExpandedBlockHashesAsync(int maxForBits)
         {
-            _expandedBlockHashes.Clear();
-            var maxFor16Bits = BitUtils.MaxNumberStoredForBits(16);
-
-            for (var i = 0; i < maxFor16Bits; i++)
+            var blocksWithInvalidHashes = await Lm.GetBlocksWithInvalidExpandedHashesAsync();
+           
+            foreach (var block in blocksWithInvalidHashes)
             {
-                await OnCompressionStatusChangingAsync($"Expanding hash {i}");
-
-                var block = await Lm.GetBlockFromDbByIndexAsync(i);
-                if (block == null)
-                    return;
-
-                var blockHash = block.ExpandedBlockHash?.ToList();
-                if (blockHash == null || blockHash.Count == 0)
-                {
-                    blockHash = block.RawData.Sha3().ToList();
-                    while (blockHash.Count < maxForBits)
-                        await blockHash.AddRangeAsync(blockHash.TakeLast_(32).ToArray().Sha3());
-                    while (blockHash.Count > maxForBits)
-                        blockHash.RemoveAt(blockHash.Count - 1);
-                    await Lm.AddExpandedBlockHashToDbByIndexAsync(i, blockHash.ToArray());
-                }
+                await OnCompressionStatusChangingAsync($"Expanding hash {block.Index}");
                 
-                _expandedBlockHashes.Add(blockHash.ToArray());
+                var blockHash = block.RawData.Sha3().ToList();
+                while (blockHash.Count < maxForBits + 1)
+                    await blockHash.AddRangeAsync(blockHash.TakeLast_(1).ToArray().Sha3());
+                while (blockHash.Count > maxForBits + 1)
+                    blockHash.RemoveLast();
+                await Lm.AddExpandedBlockHashToDbByIndexAsync((int)block.Index, blockHash.ToArray());
+            }
+
+            var blockCount = await Lm.GetBlockCountAsync();
+            if (_expandedBlockHashes.Count != blockCount)
+            {
+                _expandedBlockHashes.Clear();
+                for (var i = 0; i < blockCount; i++)
+                {
+                    await OnCompressionStatusChangingAsync($"Caching hash {i}");
+                    var blockHash = await Lm.GetExpandedBlockHashFromDbByindexAsync(i);
+                    await _expandedBlockHashes.AddAsync(blockHash.ToArray());
+                }
             }
         }
         
+        public async Task DecompressAsync(string compressedFilePath)
+        {
+            var fileSize = new FileInfo(compressedFilePath).Length;
+            var maxForBits = BitUtils.MaxNumberStoredForBits(12);
+            var originalFilePath = compressedFilePath;
+
+            await OnCompressionStatusChangingAsync("Expanding hashes");
+            await CreateExpandedBlockHashesAsync(maxForBits);
+
+            await OnCompressionStatusChangingAsync("Getting layers amount");
+            var layer = (await GetNumberOfLayersAsync(compressedFilePath)).ToInt();
+            
+            while (layer > 0)
+                compressedFilePath = await DecompressLayerAsync(compressedFilePath, layer--, fileSize);
+            
+            PostProcessLayerFilesAfterDecompression(originalFilePath, layer + 1);
+
+            await OnCompressionStatusChangingAsync(fileSize, fileSize, layer + 1, "Deompressed");
+        }
+
+        private static async Task<byte[]> GetFlagsFileForMapFilePathAsync(string compressedFilePath)
+        {
+            return await FileUtils.ReadBytesAsync(
+                PathUtils.Combine(PathSeparator.BSlash, compressedFilePath, ".flags"),
+                new FileInfo(compressedFilePath).Length - 1, 1);
+        }
+
+        private static string GetLayerFilePath(string originalFIlePath, int layer)
+        {
+            var dir = Path.GetDirectoryName(originalFIlePath);
+            var fileName = new FileInfo(originalFIlePath).Name.BeforeLastOrWhole(".").BeforeLastOrWhole(".L");
+            return PathUtils.Combine(PathSeparator.BSlash, dir, $"{fileName}.L{layer}.lid");
+        }
+
+        private static string GetFlagsFilePath(string originalFIlePath, int layer) => GetFlagsFilePathForLayerPath(GetLayerFilePath(originalFIlePath, layer));
+        private static string GetFlagsFilePathForLayerPath(string layerFilePath) => $"{layerFilePath}.flags";
+
+        private static async Task<byte> GetNumberOfLayersAsync(string compressedFilePath) => (await GetFlagsFileForMapFilePathAsync(compressedFilePath)).Single();
+        private static async Task<BitArray> GetFlagsAsync(string compressedFilePath)
+            => (await GetFlagsFileForMapFilePathAsync(compressedFilePath)).SkipLast_(1).ToArray().ToBitArray();
+        
+        private async Task<string> DecompressLayerAsync(string compressedFilePath, int layer, long fileSize)
+        {
+            byte[] compressedChunk;
+            long offset = 0;
+            string mapFilePath;
+
+            var layerFlags = await GetFlagsAsync(compressedFilePath);
+
+            do
+            {
+                await OnCompressionStatusChangingAsync(offset, fileSize, layer, "Deompressing");
+
+                var compressedChunkSize = layerFlags[layer] ? 7 : 8;
+                compressedChunk = await FileUtils.ReadBytesAsync(compressedFilePath, offset, compressedChunkSize);
+              
+                var decodedBytes = await DecodeMatchesFromBlockchainAsync(compressedChunk);
+                
+                mapFilePath = await SaveToFileAsync(compressedFilePath, layer, decodedBytes);
+                
+                offset += compressedChunkSize;
+            } 
+            while (compressedChunk.Length > 0);
+
+            await PostProcessFlagsFileAfterCompressionAsync(compressedFilePath, layer);
+           
+            await OnCompressionStatusChangingAsync(fileSize, fileSize, layer, $"L{layer} Compressed");
+
+            // remove end byte
+
+            return mapFilePath;
+        }
+
+        private async Task<byte[]> DecodeMatchesFromBlockchainAsync(byte[] compressedChunk)
+        {
+            if (!compressedChunk.Length.In(7, 8))
+                throw new ArgumentOutOfRangeException(null, @"Invalid compressed chunk size");
+
+            var chunkBits = compressedChunk.ToBitArray<bool>();
+            var blockIndex = (compressedChunk.Length == 7 ? chunkBits.Take(8) : chunkBits.Take(16)).BitArrayToByteArray().ToInt();
+            var offsets = compressedChunk.Skip(compressedChunk.Length == 7 ? 8 : 16).Batch(12).Select(b => b.BitArrayToByteArray().ToInt()).ToArray();
+
+            var blockExpandedHash = await Lm.GetExpandedBlockHashFromDbByindexAsync(blockIndex) ?? throw new NullReferenceException("No expanded hash for the given block");
+            var decodedBytes = new byte[4];
+            for (var i = 0; i < offsets.Length; i++)
+                decodedBytes[i] = blockExpandedHash[offsets[i]];
+
+            return decodedBytes;
+        }
+
+        private static async Task<string> SaveToFileAsync(string compressedFilePath, int layer, byte[] decodedBytes)
+        {
+            if (decodedBytes.Length == 8)
+                throw new ArgumentOutOfRangeException(null, @"Invalid decoded bytes size");
+
+            var mapFilePath = GetLayerFilePath(compressedFilePath, layer - 1);
+            await FileUtils.AppendAllBytesAsync(mapFilePath, decodedBytes);
+            
+            return mapFilePath;
+        }
+
+        private static void PostProcessLayerFilesAfterDecompression(string originalFilePath, int layer)
+        {
+            var dir = new DirectoryInfo(Path.GetDirectoryName(originalFilePath) ?? throw new NullReferenceException());
+            var fileName = new FileInfo(originalFilePath).Name.BeforeLastOrWhole(".");
+            var compressedFiles = dir.EnumerateFiles($"{fileName}.L*.lid*").ToArray();
+            var fileExcludingCurrentLayer = compressedFiles.Where(f => !f.Name.Between(".L", ".").Equals((layer - 1).ToString())).ToArray();
+            var currentLayerFiles = compressedFiles.Except(fileExcludingCurrentLayer).ToArray();
+
+            foreach (var file in fileExcludingCurrentLayer.Where(f => !f.Name.EndsWithInvariant(".flags"))) 
+                file.Delete();
+
+            foreach (var file in currentLayerFiles) 
+                file.Rename($"{file.Name.BeforeLast(".L")}.lid{file.Name.AfterLastOrNull("lid")}");
+        }
+
         private class RawBlockchainMatch
         {
             public int BlockNumber { get; set; }

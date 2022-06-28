@@ -21,6 +21,7 @@ namespace WpfMyCompression.Source.Services
         Task<DbRawBlock> GetBlockFromDbByIndexAsync(int index);
         Task<byte[]> GetExpandedBlockHashFromDbByindexAsync(int index);
         Task<byte[]> AddExpandedBlockHashToDbByIndexAsync(int index, byte[] blockHash);
+        Task<DbRawBlock[]> GetBlocksWithInvalidExpandedHashesAsync();
 
         event MyAsyncEventHandler<ILitecoinManager, LitecoinManager.RawBlockchainSyncStatusChangedEventArgs> RawBlockchainSyncStatusChanged;
         
