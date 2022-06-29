@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using CommonLib.Source.Common.Converters;
+using CommonLib.Source.Common.Extensions;
 using CommonLib.Source.Common.Utils.TypeUtils;
 using CommonLib.Wpf.Source.Common.Utils;
 using CommonLib.Wpf.Source.Common.Utils.TypeUtils;
@@ -52,7 +53,10 @@ namespace WpfMyCompression.Source.Windows
             
             this.InitializeCommonComponents(Properties.Resources.NotifyIcon);
             Lm.RawBlockchainSyncStatusChanged += LitecoinManager_RawBlockchainSyncStatusChanged;
-            await Lm.NotifyBlockchainSyncStatusChangedAsync();
+            
+            var initialSyncStatus = await ExceptionUtils.CatchAsync<Exception>(async () => await Lm.NotifyBlockchainSyncStatusChangedAsync());
+            if (!initialSyncStatus.IsSuccess)
+                lblOperation.Content = "Can't connect to blockchain";
 
             Ce.CompressionStatusChanged += CompressionEngine_CompressionStatusChanged;
 
@@ -95,9 +99,16 @@ namespace WpfMyCompression.Source.Windows
 
         private async void BtnCompressDecompress_Click(object sender, RoutedEventArgs e)
         {
+            if (!OperatingSystem.IsWindowsVersionAtLeast(7))
+                throw new PlatformNotSupportedException();
+            
             btnSyncPause.IsEnabled = false;
             btnCompressDecompress.IsEnabled = false;
             btnClear.IsEnabled = false;
+            btnChooseSourceFile.IsEnabled = false;
+            txtSourceFile.IsEnabled = false;
+
+            WpfAsyncUtils.ShowLoader(gridSourceFile);
 
             if (btnCompressDecompress.Content.ToString() == "Compress")
             {
@@ -108,20 +119,38 @@ namespace WpfMyCompression.Source.Windows
                     lblOperation.Content = "Compressing...";
                     var compress = await CompressAsync();
                     if (compress.IsSuccess)
+                    {
                         btnCompressDecompress.Content = "Decompress";
+                        _sourceFIle = $"{_sourceFIle.BeforeLastOrWhole(".")}.lid";
+                        txtSourceFile.Text = _sourceFIle.AfterLast(@"\");
+                    }
                     else
                         lblOperation.Content = compress.Error.Message;
                 }
             }
             else if (btnCompressDecompress.Content.ToString() == "Decompress")
             {          
-                var decompress = await DecompressAsync();
-                if (decompress.IsSuccess)
-                    btnCompressDecompress.Content = "Compress";
+                if (!File.Exists(_sourceFIle) || !_sourceFIle.EndsWith(".lid"))
+                    lblOperation.Content = "File doesn't exist or has wrong extension";
                 else
-                    lblOperation.Content = decompress.Error.Message;
+                {
+                    lblOperation.Content = "Deompressing...";
+                    var compress = await DecompressAsync();
+                    if (compress.IsSuccess)
+                    {
+                        btnCompressDecompress.Content = "Compress";
+                        _sourceFIle = $"{_sourceFIle.BeforeLastOrWhole(".")}.decompressed";
+                        txtSourceFile.Text = _sourceFIle.AfterLast(@"\");
+                    }
+                    else
+                        lblOperation.Content = compress.Error.Message;
+                }
             }
+
+            WpfAsyncUtils.HideLoader(gridSourceFile);
             
+            txtSourceFile.IsEnabled = true;
+            btnChooseSourceFile.IsEnabled = true;
             btnClear.IsEnabled = true;
             btnCompressDecompress.IsEnabled = true;
             btnSyncPause.IsEnabled = true;

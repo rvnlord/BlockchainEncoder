@@ -96,8 +96,8 @@
             <Label x:Name="lblSignature" Content="rvnlord" Margin="0,0,0,0" Panel.ZIndex="10" Foreground="White" FontStyle="Italic" HorizontalAlignment="Right" VerticalAlignment="Bottom" Height="18"/>
 
             <ProgressBar Minimum="0" Maximum="100" Value="0" Name="pbStatus" Height="30" HorizontalAlignment="Left" VerticalAlignment="Top" Width="520" Margin="0,0,0,0" Background="{StaticResource pbBackgroundBrush}" Foreground="{StaticResource pbForegroundBrush}"></ProgressBar>
-            <Label x:Name="lblStatus" HorizontalAlignment="Center" VerticalAlignment="Top" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Height="30">
-                <TextBlock x:Name="txtbStatus" Text="{Binding ElementName=pbStatus, Path=Value, StringFormat={}{0:0}%}" Foreground="White" TextAlignment="Left" />
+            <Label x:Name="lblStatus" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Height="30" Margin="470,0,0,0">
+                <TextBlock x:Name="txtbStatus" Text="{Binding ElementName=pbStatus, Path=Value, StringFormat={}{0:0}%}" Foreground="White" TextAlignment="Right" Width="40" />
             </Label>
             <Label x:Name="lblOperation" Content="Operation..." HorizontalAlignment="Left" Margin="10,0,0,0" VerticalAlignment="Top" Foreground="White" Height="30"/>
         </Grid>

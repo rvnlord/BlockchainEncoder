@@ -17,12 +17,16 @@ namespace WpfMyCompression.Source.Services
         Task<DbRawBlock> SyncRawBlockchain();
         Task PauseSyncingRawBlockchainAsync();
         Task NotifyBlockchainSyncStatusChangedAsync();
+        Task<int> GetDbBlockCountAsync();
         Task<int> GetBlockCountAsync();
         Task<DbRawBlock> GetBlockFromDbByIndexAsync(int index);
         Task<byte[]> GetExpandedBlockHashFromDbByindexAsync(int index);
         Task<byte[]> AddExpandedBlockHashToDbByIndexAsync(int index, byte[] blockHash);
         Task<DbRawBlock[]> GetBlocksWithInvalidExpandedHashesAsync();
-
+        public Task<RawBlock> GetRawBlockByIndexAsync(int blockIndex);
+        public Task<DbRawBlock> AddRawBlockToDbAsync(DbRawBlock block);
+        public Task<DbRawBlock> AddRawBlockToDbByIndexAsync(int blockIndex);
+        
         event MyAsyncEventHandler<ILitecoinManager, LitecoinManager.RawBlockchainSyncStatusChangedEventArgs> RawBlockchainSyncStatusChanged;
         
     }

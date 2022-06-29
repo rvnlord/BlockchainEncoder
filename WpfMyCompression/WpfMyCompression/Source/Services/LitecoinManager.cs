@@ -54,7 +54,7 @@ namespace WpfMyCompression.Source.Services
 
             //
             //var block = await Rpc.GetBlockAsync(2284382);
-
+            
             var lastBlockHash = await Rpc.GetBestBlockHashAsync();
             var lastBlockHeight = (await Rpc.GetBlockStatsAsync(lastBlockHash)).Height;
             ////var lastBlock = await Rpc.GetBlockAsync(lastBlockHash);
@@ -145,7 +145,9 @@ namespace WpfMyCompression.Source.Services
             await TaskUtils.WaitUntil(() => _isBlockchainSyncPaused);
         }
 
-        public async Task<int> GetBlockCountAsync() => await Db.RawBlocks.CountAsync();
+        public async Task<int> GetDbBlockCountAsync() => await Db.RawBlocks.CountAsync();
+
+        public async Task<int> GetBlockCountAsync() => (await Rpc.GetBlockStatsAsync(await Rpc.GetBestBlockHashAsync())).Height;
 
         public async Task<DbRawBlock> GetBlockFromDbByIndexAsync(int index) => await Db.RawBlocks.SingleOrDefaultAsync(b => b.Index == index);
 
@@ -162,6 +164,21 @@ namespace WpfMyCompression.Source.Services
         {
             var maxSize = BitUtils.MaxNumberStoredForBits(12) + 1;
             return await (await Db.RawBlocks.WhereAsync(b => b.ExpandedBlockHash == null || b.ExpandedBlockHash.Length < maxSize)).ToArrayAsync();
+        }
+
+        public async Task<RawBlock> GetRawBlockByIndexAsync(int blockIndex) => await Rpc.GetBlockAsync(blockIndex).ToRawBlock(blockIndex);
+
+        public async Task<DbRawBlock> AddRawBlockToDbAsync(DbRawBlock block)
+        {
+            await Db.RawBlocks.AddAsync(block);
+            return block;
+        }
+
+        public async Task<DbRawBlock> AddRawBlockToDbByIndexAsync(int blockIndex)
+        {
+            var block = await AddRawBlockToDbAsync(await GetRawBlockByIndexAsync(blockIndex).ToDbRawBlock());
+            await Db.SaveChangesAsync();
+            return block;
         }
 
         public event MyAsyncEventHandler<ILitecoinManager, RawBlockchainSyncStatusChangedEventArgs> RawBlockchainSyncStatusChanged;
