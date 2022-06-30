@@ -37,7 +37,7 @@ namespace WpfMyCompression.Source.Services
             _preloadHashesToMemory = preloadHashesToMemory;
         }
 
-        public async Task CompressAsync(string filePath)
+        public async Task<string> CompressAsync(string filePath)
         {
             var intoLayerFileSize = new FileInfo(filePath).Length;
             long fromLayerFileSize;
@@ -64,7 +64,8 @@ namespace WpfMyCompression.Source.Services
             
             await OnCompressionStatusChangingAsync(fileSize, fileSize, intoLayer, $"Compressed into {new FileInfo(GetLayerFilePath(filePath, intoLayer)).Length.ToFileSizeString()}");
 
-            await PostProcessLayerFilesAfterCompressionAsync(filePath, intoLayer);
+            var compressedFilePath = await PostProcessLayerFilesAfterCompressionAsync(filePath, intoLayer);
+            return compressedFilePath;
         }
 
         private static async Task RemoveCompressedFilesAsync(string filePath)
@@ -116,12 +117,10 @@ namespace WpfMyCompression.Source.Services
         private async Task CompressLayerAsync(string filePath, int intoLayer)
         {
             long offset = 0;
-
             var fromLayerFilePath = intoLayer == 1 ? filePath : GetLayerFilePath(filePath, intoLayer - 1);
             var intoLayerFilePath = GetLayerFilePath(filePath, intoLayer);
             var fromLayerFileSize = new FileInfo(fromLayerFilePath).Length;
            
-
             while (offset < fromLayerFileSize)
             {
                 await OnCompressionStatusChangingAsync(offset, fromLayerFileSize, intoLayer, "Compressing");
@@ -138,17 +137,20 @@ namespace WpfMyCompression.Source.Services
             await OnCompressionStatusChangingAsync(fromLayerFileSize, fromLayerFileSize, intoLayer, $"L{intoLayer} Compressed into {intoLayerFileSize.ToFileSizeString()}");
         }
         
-        private static async Task PostProcessLayerFilesAfterCompressionAsync(string filePath, int intoLayer)
+        private static async Task<string> PostProcessLayerFilesAfterCompressionAsync(string filePath, int intoLayer)
         {
             var dir = new DirectoryInfo(Path.GetDirectoryName(filePath) ?? throw new NullReferenceException());
             var fileName = new FileInfo(filePath).Name.BeforeLastOrWhole(".");
             var compressedFiles = dir.EnumerateFiles($"{fileName}.L*.lid").ToArray();
-            var fileExcludingCurrentLayer = compressedFiles.Where(f => !f.Name.Between(".L", ".").Equals(intoLayer.ToString())).ToArray();
-            var currentLayerFiles = compressedFiles.Except(fileExcludingCurrentLayer).ToArray();
+            var filesExcludingCurrentLayer = compressedFiles.Where(f => !f.Name.Between(".L", ".").Equals(intoLayer.ToString())).ToArray();
+            var intoLayerFile = compressedFiles.Except(filesExcludingCurrentLayer).Single();
+            
+            var metadata = $"{intoLayer}|{new FileInfo(filePath).Extension.Skip(1)}".UTF8ToBase58();
 
-            await fileExcludingCurrentLayer.DeleteAllAsync();
-            foreach (var file in currentLayerFiles) 
-                await file.RenameAsync($"{file.Name.BeforeLast(".L")}.lid");
+            await filesExcludingCurrentLayer.DeleteAllAsync();
+            await intoLayerFile.RenameAsync($"{intoLayerFile.Name.BeforeLast(".L")}-{metadata}-.lid");
+
+            return intoLayerFile.FullName;
         }
 
         private async Task<List<RawBlockchainMatch>> FindBestMatchesAsync(byte[] chunk, long offset, long previousLayerFileSize, int layer)
@@ -281,19 +283,16 @@ namespace WpfMyCompression.Source.Services
                 var intoLayerFilePath = GetLayerFilePath(filePath, intoLayer);
                 await FileUtils.AppendAllBytesAsync(intoLayerFilePath, encoded);
                 _filePart.Clear();
-
-                if (isLastOffset)
-                    await FileUtils.AppendAllBytesAsync(intoLayerFilePath, intoLayer.ToByteArray().Take(1).ToArray());
             }
         }
         
-        public async Task DecompressAsync(string compressedFilePath)
+        public async Task<string> DecompressAsync(string compressedFilePath)
         {
             await OnCompressionStatusChangingAsync("Removing already decompressed files");
-            await RemoveMapFilesAsync(compressedFilePath);
+            await RemoveLayerFilesAsync(compressedFilePath);
             
             await OnCompressionStatusChangingAsync("Getting layers amount");
-            var fromLayer = await GetLayerFromFile(compressedFilePath);
+            var fromLayer = GetLayerFromCompressedFile(compressedFilePath);
             var originalFromLayer = fromLayer;
             
             while (fromLayer > 0)
@@ -302,27 +301,32 @@ namespace WpfMyCompression.Source.Services
             var fileSize = new FileInfo(compressedFilePath).Length; // 'fromLayer' is last decompressed layer less one after the loop so effectively I can use 'fromLayer' instead of creating new 'intoLayer' variable
             await OnCompressionStatusChangingAsync(fileSize, fileSize, fromLayer, $"Decompressed into {new FileInfo(GetLayerFilePath(compressedFilePath, fromLayer)).Length.ToFileSizeString()}");
 
-            await PostProcessLayerFilesAfterDecompressionAsync(compressedFilePath, fromLayer);
+            var decompressedFilePath = await PostProcessLayerFilesAfterDecompressionAsync(compressedFilePath, fromLayer);
+            return decompressedFilePath;
         }
 
-        private static async Task RemoveMapFilesAsync(string filePath)
+        private static async Task RemoveLayerFilesAsync(string filePath)
         {
             var dir = new DirectoryInfo(Path.GetDirectoryName(filePath) ?? throw new NullReferenceException());
-            var fileName = new FileInfo(filePath).Name.BeforeLastOrWhole(".");
-            var mapFiles = dir.EnumerateFiles($"{fileName}.L*.lid");
-            var decompressedFiles = dir.EnumerateFiles($"{fileName}.decompressed");
+            var fi = new FileInfo(filePath);
+            var fileName = fi.Name.BeforeLastOrWhole(".");
+            var layerFiles = dir.EnumerateFiles($"{fileName}.L*.lid");
+            var decompressedFiles = dir.EnumerateFiles($"{fileName.BeforeOrWhole("-", -2)}.dec.{GetExtensionFromCompressedFile(fileName)}");
+            var oldDecompressedFiles = dir.EnumerateFiles($"{fileName.BeforeOrWhole("-", -2)}.decompressed");
 
-            await mapFiles.Concat(decompressedFiles).DeleteAllAsync();
+            await layerFiles.ConcatMany(decompressedFiles, oldDecompressedFiles).DeleteAllAsync();
         }
         
-        private static string GetLayerFilePath(string originalFIlePath, int layer)
+        private static string GetLayerFilePath(string compressedFIlePath, int layer)
         {
-            var dir = Path.GetDirectoryName(originalFIlePath);
-            var fileName = new FileInfo(originalFIlePath).Name.BeforeLastOrWhole(".").BeforeLastOrWhole(".L");
+            var dir = Path.GetDirectoryName(compressedFIlePath);
+            var fileName = new FileInfo(compressedFIlePath).Name.BeforeLastOrWhole(".").BeforeLastOrWhole(".L");
             return PathUtils.Combine(PathSeparator.BSlash, dir, $"{fileName}.L{layer}.lid");
         }
         
-        private static async Task<byte> GetLayerFromFile(string compressedFilePath) => (await FileUtils.ReadBytesAsync(compressedFilePath, new FileInfo(compressedFilePath).Length - 1, 1)).Single();
+        private static string GetMetadataFromCompressedFile(string compressedFilePath) => compressedFilePath.After("-", -2).Before("-").Base58ToUTF8();
+        private static int GetLayerFromCompressedFile(string compressedFilePath) => GetMetadataFromCompressedFile(compressedFilePath).Before("|").ToInt();
+        private static string GetExtensionFromCompressedFile(string compressedFilePath) => GetMetadataFromCompressedFile(compressedFilePath).After("|");
 
         private async Task DecompressLayerAsync(string compressedFilePath, int fromLayer, int originalLayer)
         {
@@ -334,7 +338,7 @@ namespace WpfMyCompression.Source.Services
             var fromLayerFileSize = new FileInfo(fromLayerFilePath).Length;
             var intoLayerFilePath = GetLayerFilePath(compressedFilePath, intoLayer);
 
-            while (byteOFfset < fromLayerFileSize - 2) // last byte is layer index
+            while (byteOFfset < fromLayerFileSize - 2) 
             {
                 await OnCompressionStatusChangingAsync(byteOFfset, fromLayerFileSize, fromLayer, "Decompressing");
                 
@@ -377,8 +381,8 @@ namespace WpfMyCompression.Source.Services
 
             Logger.For<CompressionEngine>().Info($"L{fromLayer}: Decompression, decoded match - B: {blockIndex}, M: {blockOffsets.JoinAsString(", ")} into {decodedBytes.Batch(2).Select(batch => batch.ToHexString().Batch(2).Select(chars => chars.JoinAsString()).JoinAsString(" ")).JoinAsString(", ")}");
             
-            return byteOFfset + nextShiftInBits / 8 + 1 >= fromLayerFileSize - 2
-                ? decodedBytes.SkipLastWhile(b => b == 0).ToArray() // skip zero bytes for last layer
+            return byteOFfset + nextShiftInBits / 8 >= fromLayerFileSize - 2
+                ? decodedBytes.SkipLastWhile(b => b == 0).ToArray() // skip zero bytes at the end
                 : decodedBytes.ToArray();
         }
 
@@ -388,17 +392,18 @@ namespace WpfMyCompression.Source.Services
             await FileUtils.AppendAllBytesAsync(mapFilePath, decodedBytes);
         }
 
-        private static async Task PostProcessLayerFilesAfterDecompressionAsync(string compressedFilePath, int intoLayer)
+        private static async Task<string> PostProcessLayerFilesAfterDecompressionAsync(string compressedFilePath, int intoLayer)
         {
             var dir = new DirectoryInfo(Path.GetDirectoryName(compressedFilePath) ?? throw new NullReferenceException());
             var fileName = new FileInfo(compressedFilePath).Name.BeforeLastOrWhole(".");
             var compressedFiles = dir.EnumerateFiles($"{fileName}.L*.lid").ToArray();
             var fileExcludingCurrentLayer = compressedFiles.Where(f => !f.Name.Between(".L", ".").Equals(intoLayer.ToString())).ToArray();
-            var currentLayerFiles = compressedFiles.Except(fileExcludingCurrentLayer).ToArray();
+            var intoLayerFile = compressedFiles.Except(fileExcludingCurrentLayer).Single();
 
             await fileExcludingCurrentLayer.DeleteAllAsync();
-            foreach (var file in currentLayerFiles) 
-                await file.RenameAsync($"{file.Name.BeforeLast(".L")}.decompressed");
+            await intoLayerFile.RenameAsync($"{intoLayerFile.Name.BeforeLast(".L").BeforeOrWhole("-", -2)}.dec.{GetExtensionFromCompressedFile(compressedFilePath)}");
+
+            return intoLayerFile.FullName;
         }
 
         private class RawBlockchainMatch

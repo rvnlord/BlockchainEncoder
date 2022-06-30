@@ -38,18 +38,7 @@ namespace WpfMyCompression.Source.Windows
         {
             if (!OperatingSystem.IsWindowsVersionAtLeast(7))
                 throw new PlatformNotSupportedException();
-
-            //var t = BitUtils.MaxNumberStoredForBits(8);
-            //var t2 = BitUtils.MaxNumberStoredForBits(13);
-
-            //var bitArrs = new List<string>();
-            //for (var i = 0; i < 6500; i++)
-            //    bitArrs.Add(i.ToBitArrayString());
-
-            //bitArrs.Reverse();
-
-            //var bits = 6500.ToBitArrayString();
-
+            
             Logger.For<MainWindow>().Info("Starting Application");
 
             WpfAsyncUtils.ShowLoader(gridMain);
@@ -81,14 +70,14 @@ namespace WpfMyCompression.Source.Windows
             await Task.CompletedTask;
         }
 
-        private async Task<ExceptionUtils.CaughtException<Exception>> CompressAsync()
+        private async Task<ExceptionUtils.CaughtExceptionAndData<Exception, string>> CompressAsync()
         {
-            return await ExceptionUtils.CatchAsync<Exception>(async () => await Ce.CompressAsync(_sourceFIle));
+            return await ExceptionUtils.CatchAsync<Exception, string>(async () => await Ce.CompressAsync(_sourceFIle));
         }
 
-        private async Task<ExceptionUtils.CaughtException<Exception>> DecompressAsync()
+        private async Task<ExceptionUtils.CaughtExceptionAndData<Exception, string>> DecompressAsync()
         {
-            return await ExceptionUtils.CatchAsync<Exception>(async () => await Ce.DecompressAsync(_sourceFIle));
+            return await ExceptionUtils.CatchAsync<Exception, string>(async () => await Ce.DecompressAsync(_sourceFIle));
         }
 
         private async Task<ExceptionUtils.CaughtExceptionAndData<Exception, DbRawBlock>> SyncAsync()
@@ -125,8 +114,8 @@ namespace WpfMyCompression.Source.Windows
                     if (compress.IsSuccess)
                     {
                         btnCompressDecompress.Content = "Decompress";
-                        _sourceFIle = $"{_sourceFIle.BeforeLastOrWhole(".")}.lid";
-                        txtSourceFile.Text = _sourceFIle.AfterLast(@"\");
+                        _sourceFIle = compress.Data;
+                        txtSourceFile.Text = compress.Data.AfterLast(@"\");
                     }
                     else
                         lblOperation.Content = compress.Error.Message;
@@ -139,15 +128,15 @@ namespace WpfMyCompression.Source.Windows
                 else
                 {
                     lblOperation.Content = "Deompressing...";
-                    var compress = await DecompressAsync();
-                    if (compress.IsSuccess)
+                    var decompress = await DecompressAsync();
+                    if (decompress.IsSuccess)
                     {
                         btnCompressDecompress.Content = "Compress";
-                        _sourceFIle = $"{_sourceFIle.BeforeLastOrWhole(".")}.decompressed";
-                        txtSourceFile.Text = _sourceFIle.AfterLast(@"\");
+                        _sourceFIle = decompress.Data;
+                        txtSourceFile.Text = decompress.Data.AfterLast(@"\");
                     }
                     else
-                        lblOperation.Content = compress.Error.Message;
+                        lblOperation.Content = decompress.Error.Message;
                 }
             }
 
