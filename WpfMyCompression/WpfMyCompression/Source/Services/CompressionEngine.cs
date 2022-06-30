@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -28,7 +27,7 @@ namespace WpfMyCompression.Source.Services
 
         public CompressionEngine(int maxLayers = 0, bool preloadHashesToMemory = true)
         {
-            ChunkSize = 4;
+            ChunkSize = 8;
             MaxLayers = maxLayers;
             _preloadHashesToMemory = preloadHashesToMemory;
         }
@@ -41,7 +40,7 @@ namespace WpfMyCompression.Source.Services
             var fileSize = new FileInfo(filePath).Length;
 
             await OnCompressionStatusChangingAsync("Removing files");
-            RemoveCompressedFiles(filePath);
+            await RemoveCompressedFilesAsync(filePath);
 
             if (_preloadHashesToMemory)
             {
@@ -59,18 +58,17 @@ namespace WpfMyCompression.Source.Services
             } 
             while (currentMapSize < previousMapSize && (MaxLayers == 0 || layer < MaxLayers));
             
-            PostProcessLayerFilesAfterCompression(filePath, layer);
-
             await OnCompressionStatusChangingAsync(fileSize, fileSize, layer, $"Compressed into {new FileInfo(GetLayerFilePath(filePath, layer)).Length.ToFileSizeString()}");
+
+            await PostProcessLayerFilesAfterCompressionAsync(filePath, layer);
         }
 
-        private static void RemoveCompressedFiles(string filePath)
+        private static async Task RemoveCompressedFilesAsync(string filePath)
         {
             var dir = new DirectoryInfo(Path.GetDirectoryName(filePath) ?? throw new NullReferenceException());
             var mapFiles = dir.EnumerateFiles("*.lid");
 
-            foreach (var file in mapFiles) 
-                file.Delete();
+            await mapFiles.DeleteAllAsync();
         }
 
         private async Task CreateExpandedBlockHashesAsync()
@@ -105,7 +103,7 @@ namespace WpfMyCompression.Source.Services
             var blockHash = block.RawData.Sha3().ToList();
             var maxSize = BitUtils.MaxSizeStoredForBits(12);
             while (blockHash.Count < maxSize)
-                await blockHash.AddRangeAsync(blockHash.TakeLast_(1).ToArray().Sha3());
+                await blockHash.AddRangeAsync(blockHash.ToArray().Sha3());
             while (blockHash.Count > maxSize)
                 blockHash.RemoveLast();
             return blockHash.ToArray();
@@ -132,7 +130,7 @@ namespace WpfMyCompression.Source.Services
             await OnCompressionStatusChangingAsync(fileSize, fileSize, layer, $"L{layer} Compressed into {new FileInfo(GetLayerFilePath(filePath, layer)).Length.ToFileSizeString()}");
         }
         
-        private static void PostProcessLayerFilesAfterCompression(string originalFilePath, int layer)
+        private static async Task PostProcessLayerFilesAfterCompressionAsync(string originalFilePath, int layer)
         {
             var dir = new DirectoryInfo(Path.GetDirectoryName(originalFilePath) ?? throw new NullReferenceException());
             var fileName = new FileInfo(originalFilePath).Name.BeforeLastOrWhole(".");
@@ -140,18 +138,16 @@ namespace WpfMyCompression.Source.Services
             var fileExcludingCurrentLayer = compressedFiles.Where(f => !f.Name.Between(".L", ".").Equals(layer.ToString())).ToArray();
             var currentLayerFiles = compressedFiles.Except(fileExcludingCurrentLayer).ToArray();
 
-            foreach (var file in fileExcludingCurrentLayer) 
-                file.Delete();
-
+            await fileExcludingCurrentLayer.DeleteAllAsync();
             foreach (var file in currentLayerFiles) 
-                file.Rename($"{file.Name.BeforeLast(".L")}.lid{file.Name.AfterLastOrNull("lid")}");
+                await file.RenameAsync($"{file.Name.BeforeLast(".L")}.lid");
         }
 
         private async Task<List<RawBlockchainMatch>> FindBestMatchesAsync(byte[] chunk, long offset, long fileSize, int layer)
         {
             var bestMatches = new List<RawBlockchainMatch>();
             var allBlockCount = await Lm.GetBlockCountAsync();
-            var batches = chunk.Batch(2).Select(b => b.Pad(2).ToArray()).ToArray();
+            var batches = chunk.Batch(2).Select(b => b.Pad(2).ToArray()).Pad(ChunkSize / 2).Select(b => b ?? new byte[2]).ToArray();
 
             for (var i = 0; i < allBlockCount; i++)
             {
@@ -185,6 +181,8 @@ namespace WpfMyCompression.Source.Services
                     break;
             }
 
+            Logger.For<CompressionEngine>().Info($"Compression, found match - B: {bestMatches[0].BlockNumber}, M: {bestMatches.Select(m => m.BlockOffset).JoinAsString(", ")} for {batches.Select(batch => batch.ToHexString().Batch(2).Select(chars => chars.JoinAsString()).JoinAsString(" ")).JoinAsString(", ")}");
+            
             return bestMatches.Count >= batches.Length ? bestMatches : throw new ArgumentOutOfRangeException(null, @"Can't find 4, 2 byte batches in a single block");
         }
 
@@ -206,11 +204,14 @@ namespace WpfMyCompression.Source.Services
                 return;
 
             var cachedHash = _expandedBlockHashes[blockIndex];
-            if (cachedHash == null || cachedHash.Length != BitUtils.MaxSizeStoredForBits(12))
+            var hashSize = BitUtils.MaxSizeStoredForBits(12);
+            if (cachedHash == null || cachedHash.Length != hashSize)
             {
                 await OnCompressionStatusChangingAsync(offset, fileSize, layer, $"Cached Hash Invalid, Expanding, B{blockIndex}");
                 var block = await Lm.GetBlockFromDbByIndexAsync(blockIndex) ?? await Lm.AddRawBlockToDbByIndexAsync(blockIndex);
-                var blockHash = await Lm.AddExpandedBlockHashToDbByIndexAsync(blockIndex, await ExpandHashAsync(block));
+                var blockHash = block.ExpandedBlockHash != null && block.ExpandedBlockHash.Length == hashSize 
+                    ? block.ExpandedBlockHash
+                    : await Lm.AddExpandedBlockHashToDbByIndexAsync(blockIndex, await ExpandHashAsync(block));
                 await _expandedBlockHashes.SetAsync(blockIndex, blockHash);
             }
         }
@@ -253,14 +254,17 @@ namespace WpfMyCompression.Source.Services
                 throw new ArgumentOutOfRangeException(null, @"Invalid Block numbers");
             if (matches.Any(m => m.ChunkLength != 2))
                 throw new ArgumentOutOfRangeException(null, @"All chunks must have 2 bytes");
+            if (matches.Count != ChunkSize / 2)
+                throw new ArgumentOutOfRangeException(null, @"There must be one match for every 2 bytes of data");
             if (matches.Any(m => m.BlockOffset > BitUtils.MaxNumberStoredForBits(12) - 1))
                 throw new ArgumentOutOfRangeException(null, @"Offset must accomodate for a chunk length");
 
             var blockNoVarInt = matches[0].BlockNumber.ToVarInt();
+
             var bits = new List<bool>(blockNoVarInt);
             foreach (var m in matches)
                 bits.AddRange(m.BlockOffset.ToBitArray<bool>().Take(12).ToArray());
-            
+
             _filePart.AddRange(bits);
 
             if (_filePart.Count % 8 == 0 || isLastOffset)
@@ -279,18 +283,31 @@ namespace WpfMyCompression.Source.Services
         {
             var fileSize = new FileInfo(compressedFilePath).Length;
 
+            await RemoveMapFilesAsync(compressedFilePath);
+
             //await OnCompressionStatusChangingAsync("Expanding hashes");
             //await CreateExpandedBlockHashesAsync();
 
             await OnCompressionStatusChangingAsync("Getting layers amount");
             var layer = await GetLayerFromFile(compressedFilePath);
+            var originalLayer = layer;
             
             while (layer > 0)
-                await DecompressLayerAsync(compressedFilePath, layer--, fileSize);
+                await DecompressLayerAsync(compressedFilePath, layer--, originalLayer, fileSize);
             
-            PostProcessLayerFilesAfterDecompression(compressedFilePath, layer + 1);
+            await OnCompressionStatusChangingAsync(fileSize, fileSize, layer + 1, $"Decompressed into {new FileInfo(GetLayerFilePath(compressedFilePath, layer)).Length.ToFileSizeString()}");
 
-            await OnCompressionStatusChangingAsync(fileSize, fileSize, layer + 1, "Deompressed");
+            await PostProcessLayerFilesAfterDecompressionAsync(compressedFilePath, layer);
+        }
+
+        private static async Task RemoveMapFilesAsync(string filePath)
+        {
+            var dir = new DirectoryInfo(Path.GetDirectoryName(filePath) ?? throw new NullReferenceException());
+            var fileName = new FileInfo(filePath).Name.BeforeLastOrWhole(".");
+            var mapFiles = dir.EnumerateFiles($"{fileName}.L*.lid");
+            var decompressedFiles = dir.EnumerateFiles($"{fileName}.decompressed");
+
+            await mapFiles.Concat(decompressedFiles).DeleteAllAsync();
         }
         
         private static string GetLayerFilePath(string originalFIlePath, int layer)
@@ -302,25 +319,27 @@ namespace WpfMyCompression.Source.Services
         
         private static async Task<byte> GetLayerFromFile(string compressedFilePath) => (await FileUtils.ReadBytesAsync(compressedFilePath, new FileInfo(compressedFilePath).Length - 1, 1)).Single();
 
-        private async Task DecompressLayerAsync(string compressedFilePath, int layer, long fileSize)
+        private async Task DecompressLayerAsync(string compressedFilePath, int layer, int originalLayer, long fileSize)
         {
             long bitOffset = 0;
+            long byteOFfset = 0;
+            var maxCompressedChunkSize = (ChunkSize / 2 * 12 + 5 + 32) / 8 + 2; // +1 to complement flooring max chunk size, +1 to account for shifting byte offset to the start of the byte containing the bit offset
+            var currentLayerFilePath = layer == originalLayer ? compressedFilePath : GetLayerFilePath(compressedFilePath, layer);
+            var currentLayerFileSize = new FileInfo(currentLayerFilePath).Length;
 
-            while (bitOffset / 8 < fileSize - 1) // last byte is layer index
+            while (byteOFfset < currentLayerFileSize - 2) // last byte is layer index
             {
-                await OnCompressionStatusChangingAsync(bitOffset / 8, fileSize, layer, "Decompressing");
+                await OnCompressionStatusChangingAsync(byteOFfset, fileSize, layer, "Decompressing");
                 
-                var maxCompressedChunkSize = (int)((ChunkSize / 2 * 12 + 5 + 32) / 8 + 1 + bitOffset % 8);
-                var compressedChunk = await FileUtils.ReadBytesAsync(compressedFilePath, bitOffset / 8, maxCompressedChunkSize);
-                var blockIndex = compressedChunk.GetFirstVarInt();
-                var varIntBlockIndexLength = compressedChunk.GetFirstVarIntLength();
-                var offsets = compressedChunk.ToBitArray<bool>().Skip(varIntBlockIndexLength).Batch(12).Take(ChunkSize / 2).Select(bits => bits.ToInt()).ToArray();
-              
-                var decodedBytes = await DecodeMatchesFromBlockchainAsync(blockIndex, offsets, bitOffset / 8, fileSize, layer); // TODO: test from here
+                var compressedChunk = await FileUtils.ReadBytesAsync(currentLayerFilePath, byteOFfset, maxCompressedChunkSize);
+                var varIntShift = (int)(bitOffset - byteOFfset * 8);
+                var nextShiftInBits = compressedChunk.GetFirstVarIntLength(varIntShift) + ChunkSize / 2 * 12;
+                var decodedBytes = await DecodeMatchesFromBlockchainAsync(compressedChunk, bitOffset, currentLayerFileSize, nextShiftInBits, fileSize, layer); // TODO: test from here
                 
                 await SaveToFileAsync(compressedFilePath, layer, decodedBytes);
                 
-                bitOffset += varIntBlockIndexLength + ChunkSize / 2 * 12;
+                bitOffset += nextShiftInBits;
+                byteOFfset = bitOffset / 8;
             }
             
             await OnCompressionStatusChangingAsync(fileSize, fileSize, layer, $"L{layer} Decompressed");
@@ -328,16 +347,31 @@ namespace WpfMyCompression.Source.Services
             _filePart.Clear();
         }
 
-        private async Task<byte[]> DecodeMatchesFromBlockchainAsync(int blockIndex, int[] blockOffsets, long offset, long fileSize, int layer)
+        private async Task<byte[]> DecodeMatchesFromBlockchainAsync(byte[] compressedChunk, long bitOffset, long currentLayerFileSize, long nextShiftInBits, long fileSize, int layer)
         {
-            await EnsureBlockDataAvailableAsync(blockIndex, offset, fileSize, layer);
-            var blockExpandedHash = await Lm.GetExpandedBlockHashFromDbByindexAsync(blockIndex);
+            if (compressedChunk == null || compressedChunk.Length == 0)
+                throw new ArgumentNullException(nameof(compressedChunk));
+            
+            var byteOFfset = bitOffset / 8;
+            var shift = (int)(bitOffset - byteOFfset * 8);
+
+            var blockIndex = compressedChunk.GetFirstVarInt(shift);
+            await EnsureBlockDataAvailableAsync(blockIndex, byteOFfset, fileSize, layer);
+
+            var varIntBlockIndexLength = compressedChunk.GetFirstVarIntLength(shift); // 5 + max 32 bits
+            var blockOffsets = compressedChunk.ToBitArray<bool>().Skip(shift + varIntBlockIndexLength).Batch(12).Take(ChunkSize / 2).Select(bits => bits.ToInt()).ToArray();
+            
+            var blockExpandedHash = _expandedBlockHashes[blockIndex] ?? await Lm.GetExpandedBlockHashFromDbByindexAsync(blockIndex);
 
             var decodedBytes = new List<byte>();
             foreach (var blockOffset in blockOffsets)
                 decodedBytes.AddRange(blockExpandedHash.Skip(blockOffset).Take(2));
 
-            return decodedBytes.ToArray();
+            Logger.For<CompressionEngine>().Info($"Decompression, decoded match - B: {blockIndex}, M: {blockOffsets.JoinAsString(", ")} into {decodedBytes.Batch(2).Select(batch => batch.ToHexString().Batch(2).Select(chars => chars.JoinAsString()).JoinAsString(" ")).JoinAsString(", ")}");
+            
+            return byteOFfset + nextShiftInBits / 8 + 1 >= currentLayerFileSize - 2
+                ? decodedBytes.SkipLastWhile(b => b == 0).ToArray() // skip zero bytes for last layer
+                : decodedBytes.ToArray();
         }
 
         private static async Task SaveToFileAsync(string compressedFilePath, int layer, byte[] decodedBytes)
@@ -346,19 +380,17 @@ namespace WpfMyCompression.Source.Services
             await FileUtils.AppendAllBytesAsync(mapFilePath, decodedBytes);
         }
 
-        private static void PostProcessLayerFilesAfterDecompression(string originalFilePath, int layer)
+        private static async Task PostProcessLayerFilesAfterDecompressionAsync(string originalFilePath, int layer)
         {
             var dir = new DirectoryInfo(Path.GetDirectoryName(originalFilePath) ?? throw new NullReferenceException());
             var fileName = new FileInfo(originalFilePath).Name.BeforeLastOrWhole(".");
             var compressedFiles = dir.EnumerateFiles($"{fileName}.L*.lid").ToArray();
-            var fileExcludingCurrentLayer = compressedFiles.Where(f => !f.Name.Between(".L", ".").Equals((layer - 1).ToString())).ToArray();
+            var fileExcludingCurrentLayer = compressedFiles.Where(f => !f.Name.Between(".L", ".").Equals(layer.ToString())).ToArray();
             var currentLayerFiles = compressedFiles.Except(fileExcludingCurrentLayer).ToArray();
 
-            foreach (var file in fileExcludingCurrentLayer) 
-                file.Delete();
-
+            await fileExcludingCurrentLayer.DeleteAllAsync();
             foreach (var file in currentLayerFiles) 
-                file.Rename($"{file.Name.BeforeLast(".L")}.lid{file.Name.AfterLastOrNull("lid")}");
+                await file.RenameAsync($"{file.Name.BeforeLast(".L")}.decompressed");
         }
 
         private class RawBlockchainMatch

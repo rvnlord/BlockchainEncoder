@@ -6,6 +6,7 @@ using System.Windows;
 using CommonLib.Source.Common.Converters;
 using CommonLib.Source.Common.Extensions;
 using CommonLib.Source.Common.Utils.TypeUtils;
+using CommonLib.Source.Common.Utils.UtilClasses;
 using CommonLib.Wpf.Source.Common.Utils;
 using CommonLib.Wpf.Source.Common.Utils.TypeUtils;
 using WpfMyCompression.Source.DbContext.Models;
@@ -48,6 +49,8 @@ namespace WpfMyCompression.Source.Windows
             //bitArrs.Reverse();
 
             //var bits = 6500.ToBitArrayString();
+
+            Logger.For<MainWindow>().Info("Starting Application");
 
             WpfAsyncUtils.ShowLoader(gridMain);
             
@@ -252,6 +255,7 @@ namespace WpfMyCompression.Source.Windows
         private async void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             await PauseAsync();
+            Logger.For<MainWindow>().Info("Closing Application");
         }
     }
 }
