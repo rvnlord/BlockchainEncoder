@@ -26,7 +26,7 @@ namespace WpfMyCompression.Source.Windows
         private string _sourceFIle;
 
         public ILitecoinManager Lm => _lm ??= new LitecoinManager();
-        public CompressionEngine Ce => _ce ??= new CompressionEngine(1);
+        public CompressionEngine Ce => _ce ??= new CompressionEngine(3, 3, 6, false);
 
         public MainWindow()
         {
@@ -75,7 +75,8 @@ namespace WpfMyCompression.Source.Windows
 
         private async Task CompressionEngine_CompressionStatusChanged(CompressionEngine sender, CompressionEngine.CompressionStatusChangedEventArgs e, CancellationToken token)
         {
-            pbStatus.Value = e.FileOffset == 0 || e.FileSize == 0 ? 0 : (double)e.FileOffset / e.FileSize * 100;
+            if (e.FileSize > 0)
+                pbStatus.Value = e.FileOffset == 0 ? 0 : (double)e.FileOffset / e.FileSize * 100;
             lblOperation.Content = e.ToString();
             await Task.CompletedTask;
         }
