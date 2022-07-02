@@ -7,10 +7,11 @@
   xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
   xmlns:u="clr-namespace:CommonLib.Wpf.Source.Common.Utils.TypeUtils;assembly=CommonLib.Wpf"
   xmlns:ig="http://schemas.infragistics.com/xaml"
+  xmlns:ige="http://infragistics.com/Editors"
   x:Class="WpfMyCompression.Source.Windows.MainWindow"
   mc:Ignorable="d"
   Title="Extreme Compression" 
-  Height="400" Width="600" 
+  Height="456" Width="618" 
   MinHeight="268" MinWidth="542"
   WindowStartupLocation="CenterScreen" 
   Padding="10" Margin="0"
@@ -66,6 +67,13 @@
         </Grid>
 
         <Grid x:Name="gridMain" Margin="10,40,10,10" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+            <ProgressBar Minimum="0" Maximum="100" Value="0" Name="pbStatus" Height="30" HorizontalAlignment="Left" VerticalAlignment="Top" Width="520" Margin="0,0,0,0" Background="{StaticResource pbBackgroundBrush}" Foreground="{StaticResource pbForegroundBrush}"></ProgressBar>
+            <Label x:Name="lblStatus" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Height="30" Margin="470,0,0,0">
+                <TextBlock x:Name="txtbStatus" Text="{Binding ElementName=pbStatus, Path=Value, StringFormat={}{0:0}%}" Foreground="White" TextAlignment="Right" Width="40" />
+            </Label>
+            <Label x:Name="lblOperation" Content="Operation..." HorizontalAlignment="Left" Margin="10,0,0,0" VerticalAlignment="Top" Foreground="White" Height="30"/>
+
+
             <Grid x:Name="gridSourceFile" HorizontalAlignment="Left" VerticalAlignment="Top" Height="150" Width="410" Margin="0,40,0,0">
                 <TextBox 
                     x:Name="txtSourceFile" 
@@ -93,13 +101,24 @@
             <Button x:Name="btnSyncPause" Content="Sync" HorizontalAlignment="Left" Height="30" Margin="420,120,0,0" VerticalAlignment="Top" Width="100" Click="BtnSyncPause_Click"/>
             <Button x:Name="btnCompressDecompress" Content="Compress" HorizontalAlignment="Left" Height="30" Margin="420,160,0,0" VerticalAlignment="Top" Width="100" Click="BtnCompressDecompress_Click"/>
 
+            <Label x:Name="lblLTCNodeAddress" Content="LTC Node Address:" Margin="0,200,0,0" Foreground="White" Height="30" Width="240"/>
+            <ige:XamMaskedEditor x:Name="xmeLTCNodeAddress" ValueChanged="XmeLTCNodeAddress_ValueChanged" Mask="{}#99\.#99\.#99\.#99:####" Height="30" Width="160" Margin="250,200,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" HorizontalContentAlignment="Right" ></ige:XamMaskedEditor>
+
+            <Label x:Name="lblLTCNodeUser" Content="LTC Node User:" Margin="0,240,0,0" Foreground="White" Height="30" Width="240"/>
+            <ige:XamTextEditor x:Name="xteLTCNodeUser" ValueChanged="XteLTCNodeUser_ValueChanged" Height="30" Width="160" Margin="250,240,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" HorizontalContentAlignment="Right" TextAlignment="Right" VerticalContentAlignment="Center"></ige:XamTextEditor>
+
+            <Label x:Name="lblLTCNodePassword" Content="LTC Node Password:" Margin="0,280,0,0" Foreground="White" Height="30" Width="240"/>
+            <PasswordBox x:Name="pwdLTCNodePassword" PasswordChanged="PwdLTCNodePassword_PasswordChanged" Height="30" Width="160" Margin="250,280,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" HorizontalContentAlignment="Right" />
+
+            <Label x:Name="lblBatchesOfBytesAllocatedPerBlock" Content="Batches of Bytes allocated per Block:" Margin="0,320,0,0" Foreground="White" Height="30" Width="240"/>
+            <ige:XamNumericEditor x:Name="xneBatchesOfBytesAllocatedPerBlock" ValueChanged="XneBatchesOfBytesAllocatedPerBlock_ValueChanged" Height="30" Width="160" Margin="250,320,0,0">
+                <ige:XamNumericEditor.ValueConstraint>
+                    <ige:ValueConstraint MinInclusive="1" MaxInclusive="8" MaxLength="1" />
+                </ige:XamNumericEditor.ValueConstraint>
+            </ige:XamNumericEditor>
+
             <Label x:Name="lblSignature" Content="rvnlord" Margin="0,0,0,0" Panel.ZIndex="10" Foreground="White" FontStyle="Italic" HorizontalAlignment="Right" VerticalAlignment="Bottom" Height="18"/>
 
-            <ProgressBar Minimum="0" Maximum="100" Value="0" Name="pbStatus" Height="30" HorizontalAlignment="Left" VerticalAlignment="Top" Width="520" Margin="0,0,0,0" Background="{StaticResource pbBackgroundBrush}" Foreground="{StaticResource pbForegroundBrush}"></ProgressBar>
-            <Label x:Name="lblStatus" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Height="30" Margin="470,0,0,0">
-                <TextBlock x:Name="txtbStatus" Text="{Binding ElementName=pbStatus, Path=Value, StringFormat={}{0:0}%}" Foreground="White" TextAlignment="Right" Width="40" />
-            </Label>
-            <Label x:Name="lblOperation" Content="Operation..." HorizontalAlignment="Left" Margin="10,0,0,0" VerticalAlignment="Top" Foreground="White" Height="30"/>
         </Grid>
     </Grid>
 </mah:MetroWindow>

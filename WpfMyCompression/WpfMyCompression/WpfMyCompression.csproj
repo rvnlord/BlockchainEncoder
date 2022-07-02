@@ -77,7 +77,6 @@
     <Folder Include="Source\Common\Extensions\" />
     <Folder Include="Source\Common\Utils\UtilsClasses\" />
     <Folder Include="Source\Data\Database\" />
-    <Folder Include="Source\Models\" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\CommonLib.Wpf\CommonLib.Wpf\CommonLib.Wpf\CommonLib.Wpf.csproj" />

@@ -5,11 +5,14 @@ using System.Threading.Tasks;
 using System.Windows;
 using CommonLib.Source.Common.Converters;
 using CommonLib.Source.Common.Extensions;
+using CommonLib.Source.Common.Utils;
 using CommonLib.Source.Common.Utils.TypeUtils;
 using CommonLib.Source.Common.Utils.UtilClasses;
 using CommonLib.Wpf.Source.Common.Utils;
 using CommonLib.Wpf.Source.Common.Utils.TypeUtils;
+using Microsoft.Extensions.Configuration;
 using WpfMyCompression.Source.DbContext.Models;
+using WpfMyCompression.Source.Models.ViewModels;
 using WpfMyCompression.Source.Services;
 using DataFormats = System.Windows.DataFormats;
 using DragDropEffects = System.Windows.DragDropEffects;
@@ -24,9 +27,10 @@ namespace WpfMyCompression.Source.Windows
         private ILitecoinManager _lm;
         private CompressionEngine _ce;
         private string _sourceFIle;
+        private CompressionConfigVM _configVM;
 
-        public ILitecoinManager Lm => _lm ??= new LitecoinManager();
-        public CompressionEngine Ce => _ce ??= new CompressionEngine(3, 3, 6, false);
+        public ILitecoinManager Lm => _lm ??= new LitecoinManager(); // `_configVM.LtcRpcCredentials` doesn't need to be passed directly since `appsettings` should always be current
+        public CompressionEngine Ce => _ce ??= new CompressionEngine(_configVM.Batches, 0, 0, false);
 
         public MainWindow()
         {
@@ -40,19 +44,93 @@ namespace WpfMyCompression.Source.Windows
                 throw new PlatformNotSupportedException();
             
             Logger.For<MainWindow>().Info("Starting Application");
-
             WpfAsyncUtils.ShowLoader(gridMain);
             
             this.InitializeCommonComponents(Properties.Resources.NotifyIcon);
-            Lm.RawBlockchainSyncStatusChanged += LitecoinManager_RawBlockchainSyncStatusChanged;
+
+            _configVM = new CompressionConfigVM
+            {
+                Batches = ConfigUtils.GetFromAppSettings().GetSection("Compression").GetValue<int>("Batches"),
+                LtcRpcCredentials = ConfigUtils.GetRPCNetworkCredential("Litecoin")
+            };
+            _configVM.PropertyChanged += CompressionConfig_PropertyChanged;
             
+            _configVM.NotifyPropertyChanged(nameof(_configVM.LtcRpcCredentials), true); // Binding manually to avoid value converters
+            _configVM.NotifyPropertyChanged(nameof(_configVM.Batches), true);
+            
+            Lm.RawBlockchainSyncStatusChanged += LitecoinManager_RawBlockchainSyncStatusChanged;
             var initialSyncStatus = await ExceptionUtils.CatchAsync<Exception>(async () => await Lm.NotifyBlockchainSyncStatusChangedAsync());
             if (!initialSyncStatus.IsSuccess)
-                lblOperation.Content = "Can't connect to blockchain";
-
+                lblOperation.Content = "Can't connect to the blockchain";
+            
             Ce.CompressionStatusChanged += CompressionEngine_CompressionStatusChanged;
 
             WpfAsyncUtils.HideLoader(gridMain);
+        }
+
+        private async void CompressionConfig_PropertyChanged(CompressionConfigVM sender, CompressionConfigVM.CompressionConfigPropertyChangedEventArgs e)
+        {
+            if (!OperatingSystem.IsWindowsVersionAtLeast(7))
+                throw new PlatformNotSupportedException();
+
+            if (e.PropertyName == nameof(CompressionConfigVM.LtcRpcCredentials))
+            {
+                var rpcAddress = _configVM.LtcRpcCredentials.Domain.BetweenOrWhole("://", "/");
+
+                if (e.SetControlValue)
+                {
+                    xmeLTCNodeAddress.Value = rpcAddress;
+                    xteLTCNodeUser.Value = _configVM.LtcRpcCredentials.UserName;
+                    pwdLTCNodePassword.Password = _configVM.LtcRpcCredentials.Password; // PasswordBox is not bindable in WPF
+                }
+                
+                await ConfigUtils.SetAppSettingValueAsync("RPCs:Litecoin:Address", rpcAddress);
+                await ConfigUtils.SetAppSettingValueAsync("RPCs:Litecoin:User", _configVM.LtcRpcCredentials.UserName);
+                await ConfigUtils.SetAppSettingValueAsync("RPCs:Litecoin:Password", _configVM.LtcRpcCredentials.Password);
+            }
+            else if (e.PropertyName == nameof(CompressionConfigVM.Batches))
+            {
+                await ConfigUtils.SetAppSettingValueAsync("Compression:Batches", _configVM.Batches.ToString());
+
+                if (e.SetControlValue)
+                    xneBatchesOfBytesAllocatedPerBlock.Value = _configVM.Batches;
+            }
+        }
+
+        private void XmeLTCNodeAddress_ValueChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            if (!OperatingSystem.IsWindowsVersionAtLeast(7))
+                throw new PlatformNotSupportedException();
+
+            _configVM.LtcRpcCredentials.Domain = $"http://{xmeLTCNodeAddress.Value}/";
+            _configVM.NotifyPropertyChanged(nameof(_configVM.LtcRpcCredentials), false); 
+        }
+
+        private void XteLTCNodeUser_ValueChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            if (!OperatingSystem.IsWindowsVersionAtLeast(7))
+                throw new PlatformNotSupportedException();
+
+            _configVM.LtcRpcCredentials.UserName = xteLTCNodeUser.Value?.ToString() ?? throw new NullReferenceException();
+            _configVM.NotifyPropertyChanged(nameof(_configVM.LtcRpcCredentials), false); 
+        }
+
+        private void PwdLTCNodePassword_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            if (!OperatingSystem.IsWindowsVersionAtLeast(7))
+                throw new PlatformNotSupportedException();
+
+            _configVM.LtcRpcCredentials.Password = pwdLTCNodePassword.Password;
+            _configVM.NotifyPropertyChanged(nameof(_configVM.LtcRpcCredentials), false); 
+        }
+
+        private void XneBatchesOfBytesAllocatedPerBlock_ValueChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            if (!OperatingSystem.IsWindowsVersionAtLeast(7))
+                throw new PlatformNotSupportedException();
+
+            _configVM.Batches = xneBatchesOfBytesAllocatedPerBlock.Value.ToInt();
+            _configVM.NotifyPropertyChanged(nameof(_configVM.Batches), false); 
         }
 
         private async Task LitecoinManager_RawBlockchainSyncStatusChanged(ILitecoinManager sender, LitecoinManager.RawBlockchainSyncStatusChangedEventArgs e, CancellationToken token)
@@ -94,7 +172,12 @@ namespace WpfMyCompression.Source.Windows
         {
             if (!OperatingSystem.IsWindowsVersionAtLeast(7))
                 throw new PlatformNotSupportedException();
-            
+
+            xmeLTCNodeAddress.IsEnabled = false;
+            xteLTCNodeUser.IsEnabled = false;
+            pwdLTCNodePassword.IsEnabled = false;
+            xneBatchesOfBytesAllocatedPerBlock.IsEnabled = false;
+
             btnSyncPause.IsEnabled = false;
             btnCompressDecompress.IsEnabled = false;
             btnClear.IsEnabled = false;
@@ -112,11 +195,7 @@ namespace WpfMyCompression.Source.Windows
                     lblOperation.Content = "Compressing...";
                     var compress = await CompressAsync();
                     if (compress.IsSuccess)
-                    {
-                        btnCompressDecompress.Content = "Decompress";
-                        _sourceFIle = compress.Data;
-                        txtSourceFile.Text = compress.Data.AfterLast(@"\");
-                    }
+                        UpdateGuiForSelectedFile(compress.Data);
                     else
                         lblOperation.Content = compress.Error.Message;
                 }
@@ -130,11 +209,7 @@ namespace WpfMyCompression.Source.Windows
                     lblOperation.Content = "Deompressing...";
                     var decompress = await DecompressAsync();
                     if (decompress.IsSuccess)
-                    {
-                        btnCompressDecompress.Content = "Compress";
-                        _sourceFIle = decompress.Data;
-                        txtSourceFile.Text = decompress.Data.AfterLast(@"\");
-                    }
+                        UpdateGuiForSelectedFile(decompress.Data);
                     else
                         lblOperation.Content = decompress.Error.Message;
                 }
@@ -147,12 +222,22 @@ namespace WpfMyCompression.Source.Windows
             btnClear.IsEnabled = true;
             btnCompressDecompress.IsEnabled = true;
             btnSyncPause.IsEnabled = true;
+
+            xmeLTCNodeAddress.IsEnabled = true;
+            xteLTCNodeUser.IsEnabled = true;
+            pwdLTCNodePassword.IsEnabled = true;
+            xneBatchesOfBytesAllocatedPerBlock.IsEnabled = true;
         }
 
         private async void BtnSyncPause_Click(object sender, RoutedEventArgs e)
         {
             if (!OperatingSystem.IsWindowsVersionAtLeast(7))
                 throw new PlatformNotSupportedException();
+
+            xmeLTCNodeAddress.IsEnabled = false;
+            xteLTCNodeUser.IsEnabled = false;
+            pwdLTCNodePassword.IsEnabled = false;
+            xneBatchesOfBytesAllocatedPerBlock.IsEnabled = false;
 
             btnCompressDecompress.IsEnabled = false;
             
@@ -186,6 +271,11 @@ namespace WpfMyCompression.Source.Windows
             }
             
             btnCompressDecompress.IsEnabled = true;
+
+            xmeLTCNodeAddress.IsEnabled = true;
+            xteLTCNodeUser.IsEnabled = true;
+            pwdLTCNodePassword.IsEnabled = true;
+            xneBatchesOfBytesAllocatedPerBlock.IsEnabled = true;
         }
         
         private void BtnClear_Click(object sender, RoutedEventArgs e)
