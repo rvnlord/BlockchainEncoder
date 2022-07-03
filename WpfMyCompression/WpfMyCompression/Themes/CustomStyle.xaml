@@ -7,15 +7,26 @@
                     xmlns:system="clr-namespace:System;assembly=mscorlib"
                     xmlns:ig="http://schemas.infragistics.com/xaml" 
                     xmlns:ige="http://infragistics.com/Editors"
-                    xmlns:igPrim="http://schemas.infragistics.com/xaml/primitives">
+                    xmlns:igPrim="http://schemas.infragistics.com/xaml/primitives"
+                    xmlns:system1="clr-namespace:System;assembly=System.Runtime"
+                    xmlns:igWindows="http://infragistics.com/Windows">
 
-    <!--#region Window-->
+    <!--#region Brushes-->
+
+    <Color x:Key="InputDisabledForegroundColor">#FF454545</Color>
 
     <SolidColorBrush x:Key="WhiteBrush" Color="White" />
     <SolidColorBrush x:Key="MouseOverTitleBarBrush" Color="#FF000040" />
     <SolidColorBrush x:Key="DefaultWindowBrush" Color="#FF1E1E1E" />
     <SolidColorBrush x:Key="DefaultForegroundBrush" Color="#FFBABABA" />
     <SolidColorBrush x:Key="TransparentBrush" Color="#00FFFFFF" />
+    <SolidColorBrush x:Key="InputDisabledBackgroundBrush" Color="#FF181818"/>
+    <SolidColorBrush x:Key="InputDisabledBorderBrush" Color="#FF333333"/>
+    <SolidColorBrush x:Key="InputDisabledForegroundBrush" Color="{StaticResource InputDisabledForegroundColor}"/>
+
+    <!--#endregion-->
+
+    <!--#region Window-->
 
     <LinearGradientBrush x:Key="pbBackgroundBrush" StartPoint="0,0" EndPoint="0,1">
         <GradientStop Color="#323232" Offset="0.0" />
@@ -222,14 +233,18 @@
     <!--#region TextBox-->
 
     <Style TargetType="{x:Type TextBox}" BasedOn="{StaticResource TextBoxStyle}">
-        <Setter Property="Padding" Value="3,5" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}" />
         <Setter Property="FontSize" Value="14" />
-        <Setter Property="Height" Value="30" />
-        <Setter Property="AcceptsReturn" Value="False" />
-        <Setter Property="TextWrapping" Value="NoWrap" />
-        <Setter Property="HorizontalAlignment" Value="Left" />
-        <Setter Property="VerticalAlignment" Value="Top" />
-        <Setter Property="ContextMenu" Value="{StaticResource emptyContextMenu}" />
+        <Setter Property="FontFamily" Value="Segoe UI" />
+        <Setter Property="Background" Value="{StaticResource TextBoxBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource TextBoxBorderBrush}" />
+        <Setter Property="MinHeight" Value="30" />
+        <Setter Property="Padding" Value="6,4" />
+        <Setter Property="SelectionBrush" Value="{StaticResource TextBoxFocusedBrush}" />
+        <Setter Property="SelectionOpacity" Value="0.4" />
+        <Setter Property="CaretBrush" Value="{StaticResource CaretForegroundBrush}"/>
+        <Setter Property="Validation.ErrorTemplate" Value="{StaticResource TextBoxValidationToolTipTemplate}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
@@ -248,8 +263,14 @@
                                     </Storyboard>
                                 </vsm:VisualState>
                                 <vsm:VisualState x:Name="Disabled">
+                                    <Storyboard>
+                                        <DoubleAnimation Duration="0" To="1" Storyboard.TargetProperty="Opacity" Storyboard.TargetName="DisabledVisualElement" />
+                                    </Storyboard>
                                 </vsm:VisualState>
                                 <vsm:VisualState x:Name="ReadOnly">
+                                    <Storyboard>
+                                        <DoubleAnimation Duration="0" To="1" Storyboard.TargetProperty="Opacity" Storyboard.TargetName="ReadOnlyVisualElement" />
+                                    </Storyboard>
                                 </vsm:VisualState>
                             </vsm:VisualStateGroup>
                             <vsm:VisualStateGroup x:Name="FocusStates">
@@ -289,7 +310,7 @@
                                         <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="IsOpen" Storyboard.TargetName="validationTooltip">
                                             <DiscreteObjectKeyFrame KeyTime="0">
                                                 <DiscreteObjectKeyFrame.Value>
-                                                    <system:Boolean>True</system:Boolean>
+                                                    <system1:Boolean>True</system1:Boolean>
                                                 </DiscreteObjectKeyFrame.Value>
                                             </DiscreteObjectKeyFrame>
                                         </ObjectAnimationUsingKeyFrames>
@@ -297,13 +318,13 @@
                                 </vsm:VisualState>
                             </vsm:VisualStateGroup>
                         </vsm:VisualStateManager.VisualStateGroups>
-                        <Border x:Name="Border" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" Opacity="1">
+                        <Border x:Name="Border" Opacity="1" BorderBrush="{StaticResource InputDisabledBorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{StaticResource InputDisabledBackgroundBrush}">
                             <Grid>
-                                <Border x:Name="ReadOnlyVisualElement" Background="{StaticResource TextBoxReadOnlyBackgroundBrush}" Opacity="0" />
+                                <Border x:Name="ReadOnlyVisualElement" Background="{StaticResource InputDisabledBackgroundBrush}" Opacity="0" />
                                 <ScrollViewer x:Name="PART_ContentHost" BorderThickness="0" IsTabStop="False" Padding="{TemplateBinding Padding}" />
                             </Grid>
                         </Border>
-                        <Border x:Name="DisabledVisualElement" BorderBrush="{StaticResource DisabledVisualElement}" BorderThickness="{TemplateBinding BorderThickness}" Background="{StaticResource DisabledVisualElement}" IsHitTestVisible="False" Opacity="0" />
+                        <Border x:Name="DisabledVisualElement" BorderBrush="{StaticResource InputDisabledBorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{StaticResource InputDisabledBackgroundBrush}" IsHitTestVisible="False" Opacity="0" />
                         <Border x:Name="FocusVisualElement" BorderBrush="{StaticResource TextBoxFocusedBrush}" BorderThickness="{TemplateBinding BorderThickness}" IsHitTestVisible="False" Opacity="0" />
                         <Border x:Name="ValidationErrorElement" BorderBrush="{StaticResource ValidationErrorElement}" BorderThickness="{TemplateBinding BorderThickness}" Visibility="Collapsed">
                             <ToolTipService.ToolTip>
@@ -315,6 +336,77 @@
                             </Grid>
                         </Border>
                     </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsReadOnly" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource InputDisabledForegroundBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--#endregion-->
+
+    <!--#region PasswordBox -->
+
+    <Style TargetType="{x:Type PasswordBox}" BasedOn="{StaticResource PasswordBoxStyle}">
+        <Setter Property="FontFamily" Value="Segoe UI" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{StaticResource PasswordBoxForegroundBrush}" />
+        <Setter Property="Background" Value="{StaticResource TextBoxBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource TextBoxBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="6,4" />
+        <Setter Property="MinHeight" Value="30" />
+        <Setter Property="SelectionBrush" Value="{StaticResource TextBoxFocusedBrush}" />
+        <Setter Property="PasswordChar" Value="●" />
+        <Setter Property="KeyboardNavigation.TabNavigation" Value="None" />
+        <Setter Property="AllowDrop" Value="true" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="ScrollViewer.PanningMode" Value="VerticalFirst" />
+        <Setter Property="Stylus.IsFlicksEnabled" Value="False" />
+        <Setter Property="FlowDirection" Value="LeftToRight" />
+        <Setter Property="CaretBrush" Value="{StaticResource CaretForegroundBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type PasswordBox}">
+                    <Grid>
+                        <vsm:VisualStateManager.VisualStateGroups>
+                            <vsm:VisualStateGroup x:Name="CommonStates">
+                                <vsm:VisualState x:Name="Normal" />
+                                <vsm:VisualState x:Name="MouseOver">
+                                    <Storyboard>
+                                        <ObjectAnimationUsingKeyFrames Duration="0" Storyboard.TargetProperty="BorderBrush" Storyboard.TargetName="Bd">
+                                            <DiscreteObjectKeyFrame KeyTime="0" Value="{StaticResource TextBoxHoverBorderBrush}" />
+                                        </ObjectAnimationUsingKeyFrames>
+                                        <ObjectAnimationUsingKeyFrames Duration="0" Storyboard.TargetProperty="Background" Storyboard.TargetName="Bd">
+                                            <DiscreteObjectKeyFrame KeyTime="0" Value="{StaticResource TextBoxHoverBackgroundBrush}" />
+                                        </ObjectAnimationUsingKeyFrames>
+                                    </Storyboard>
+                                </vsm:VisualState>
+                            </vsm:VisualStateGroup>
+                        </vsm:VisualStateManager.VisualStateGroups>
+                        <!-- alternative for a trigger -->
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" />
+                        <Border x:Name="DisabledVisualElement" BorderBrush="{StaticResource InputDisabledBorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{StaticResource InputDisabledBackgroundBrush}" IsHitTestVisible="False" Opacity="0"></Border>
+                        <Border x:Name="ReadOnlyVisualElement" Background="{StaticResource InputDisabledBackgroundBrush}" Opacity="0" />
+                        <Border>
+                            <ScrollViewer x:Name="PART_ContentHost" />
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="1" TargetName="DisabledVisualElement" />
+                            <Setter Property="Foreground" Value="{StaticResource InputDisabledForegroundBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="BorderBrush" Value="{StaticResource TextBoxHoverBorderBrush}" TargetName="Bd" />
+                        </Trigger>
+                        <Trigger Property="IsFocused" Value="True">
+                            <Setter Property="BorderBrush" Value="{StaticResource TextBoxFocusedBrush}" TargetName="Bd" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -646,7 +738,7 @@
 
     <!-- #endregion -->
 
-        <!--#region xamRadialGauge-->
+    <!--#region xamRadialGauge-->
 
     <Style TargetType="{x:Type ig:XamRadialGauge}" BasedOn="{StaticResource {x:Type ig:XamRadialGauge}}">
         <Setter Property="Value" Value="75" />
@@ -678,7 +770,7 @@
         <Setter Property="Width" Value="120" />
         <Setter Property="HorizontalAlignment" Value="Left"></Setter>
         <Setter Property="VerticalAlignment" Value="Top"></Setter>
-        <Setter Property="Mask" Value="{}nnnn"></Setter>
+        <Setter Property="Mask" Value="{}n"></Setter>
         <Setter Property="InvalidValueBehavior" Value="Default"></Setter>
     </Style>
 
@@ -712,6 +804,158 @@
         <Setter Property="Width" Value="120" />
         <Setter Property="HorizontalAlignment" Value="Left"></Setter>
         <Setter Property="VerticalAlignment" Value="Top"></Setter>
+    </Style>
+
+    <!--#endregion-->
+
+    <!--#region XamTextEditor -->
+
+    <Style TargetType="{x:Type ige:XamTextEditor}" BasedOn="{StaticResource {x:Type ige:XamTextEditor}}">
+        <Setter Property="FontFamily" Value="Segoe UI" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="6,4"/>
+        <Setter Property="MinHeight" Value="30" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ige:XamTextEditor}">
+                    <Border x:Name="MainBorder"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"
+                            >
+                        <vsm:VisualStateManager.VisualStateGroups>
+                            <vsm:VisualStateGroup x:Name="CommonStates">
+                                <vsm:VisualState x:Name="Normal" />
+                                <vsm:VisualState x:Name="MouseOver">
+                                    <Storyboard>
+                                        <ObjectAnimationUsingKeyFrames Duration="0" Storyboard.TargetProperty="BorderBrush" Storyboard.TargetName="MainBorder">
+                                            <DiscreteObjectKeyFrame KeyTime="0" Value="{StaticResource TextBoxHoverBorderBrush}" />
+                                        </ObjectAnimationUsingKeyFrames>
+                                        <ObjectAnimationUsingKeyFrames Duration="0" Storyboard.TargetProperty="Background" Storyboard.TargetName="MainBorder">
+                                            <DiscreteObjectKeyFrame KeyTime="0" Value="{StaticResource TextBoxHoverBackgroundBrush}" />
+                                        </ObjectAnimationUsingKeyFrames>
+                                    </Storyboard>
+                                </vsm:VisualState>
+                            </vsm:VisualStateGroup>
+                        </vsm:VisualStateManager.VisualStateGroups>
+                        <igWindows:SimpleTextBlock x:Name="TextBlock"
+                                                   Text="{TemplateBinding DisplayText}"
+                                                   TextWrapping="{TemplateBinding TextWrapping}"
+                                                   HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                   VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                   TextAlignment="{TemplateBinding TextAlignmentResolved}"
+                                                   Foreground="{TemplateBinding Foreground}"
+                                                   Margin="{TemplateBinding Padding}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEmbedded" Value="False">
+                            <Setter Property="igWindows:SimpleTextBlock.OptimizeWidthMeasurement" Value="False" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="EditTemplate">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type ige:XamTextEditor}">
+                    <Border x:Name="MainBorder"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}">
+
+                        <TextBox Name="PART_FocusSite"
+                                 MinHeight="0"
+                                 AcceptsReturn="{TemplateBinding AcceptsReturn}"
+                                 AcceptsTab="{TemplateBinding AcceptsTab}"
+                                 TextWrapping="{TemplateBinding TextWrapping}"
+                                 HorizontalScrollBarVisibility="{TemplateBinding HorizontalScrollBarVisibility}"
+                                 VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}"
+                                 HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                 VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                 TextAlignment="{TemplateBinding TextAlignmentResolved}"
+                                 IsReadOnly="{TemplateBinding ReadOnly}"
+                                 MaxLength="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=ValueConstraint.MaxLength, Mode=OneWay}"
+                                 Background="Transparent" Padding="0" Margin="0"
+                                 BorderBrush="Transparent"
+                                 BorderThickness="0,0,0,0"
+                                 ContextMenu="{TemplateBinding ContextMenu}"
+                                 SpellCheck.IsEnabled="{TemplateBinding SpellCheck.IsEnabled}"
+                                 SpellCheck.SpellingReform="{TemplateBinding SpellCheck.SpellingReform}"
+                                 InputMethod.PreferredImeState="{TemplateBinding InputMethod.PreferredImeState}"
+                                 InputMethod.IsInputMethodEnabled="{TemplateBinding InputMethod.IsInputMethodEnabled}"
+                                 InputMethod.PreferredImeConversionMode="{TemplateBinding InputMethod.PreferredImeConversionMode}"
+                                 FontSize="{TemplateBinding FontSize}"
+                                 Foreground="{TemplateBinding Foreground}"
+                                 SelectionBrush="{DynamicResource {ComponentResourceKey TypeInTargetAssembly={x:Type ige:XamTextEditor}, ResourceId=SelectionBrush}}"
+                                 SelectionOpacity="0.4"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsInEditMode" Value="True">
+                            <Setter Property="IsTabStop" Value="False" />
+                        </Trigger>
+                        <Trigger Property="IsEmbedded" Value="True">
+                            <Setter TargetName="MainBorder" Property="Padding" 
+                                    Value="{Binding Padding, RelativeSource={RelativeSource TemplatedParent}}" />
+                        </Trigger>
+                        <Trigger Property="IsEmbedded" Value="False">
+                            <Setter TargetName="PART_FocusSite" Property="Margin" 
+                                    Value="{Binding Padding, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource XamTextEditorMarginConverter}}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsEmbedded" Value="True">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderBrush" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+            </Trigger>
+            <MultiTrigger>
+                <MultiTrigger.Conditions>
+                    <Condition Property="IsEmbedded" Value="True" />
+                    <Condition Property="IsInEditMode" Value="True" />
+                </MultiTrigger.Conditions>
+                <Setter Property="Background" Value="{StaticResource EditorsBackgroundBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource EditorsFocusBorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1,1,0,0"/>
+                <Setter Property="Padding" Value="6,4"/>
+            </MultiTrigger>
+            <MultiTrigger>
+                <MultiTrigger.Conditions>
+                    <Condition Property="IsMouseOver" Value="True" />
+                    <Condition Property="IsEmbedded" Value="False" />
+                </MultiTrigger.Conditions>
+                <Setter Property="BorderBrush" Value="{DynamicResource {x:Static ige:EditorsBrushKeys.EditorsHottrackBorderFillKey}}" />
+                <Setter Property="Background" Value="{StaticResource EditorsHoverBackgroundBrush}" />
+            </MultiTrigger>
+            <Trigger Property="IsEmbedded" Value="False">
+                <!-- JJD 09/12/14 TFS179326 Set the foreground in a trigger when IsEmbedded is false  -->
+                <Setter Property="Background" Value="{StaticResource EditorsBackgroundBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource {x:Static ige:EditorsBrushKeys.EditorsNormalBorderFillKey}}"/>
+                <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}"/>
+                <Setter Property="FontSize" Value="14.667"/>
+                <Setter Property="Padding" Value="6,4"/>
+            </Trigger>
+            <MultiTrigger>
+                <MultiTrigger.Conditions>
+                    <Condition Property="IsFocusWithin" Value="True" />
+                    <Condition Property="IsEmbedded" Value="False" />
+                </MultiTrigger.Conditions>
+                <Setter Property="BorderBrush" Value="{StaticResource EditorsFocusBorderBrush}" />
+                <Setter Property="Padding" Value="6,4"/>
+            </MultiTrigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Background" Value="{DynamicResource {ComponentResourceKey TypeInTargetAssembly={x:Type ige:XamTextEditor}, ResourceId=EditorsDisabledBackgroundBrush}}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource {ComponentResourceKey TypeInTargetAssembly={x:Type ige:XamTextEditor}, ResourceId=EditorsDisabledBorderBrush}}" />
+                <Setter Property="Foreground" Value="{DynamicResource {ComponentResourceKey TypeInTargetAssembly={x:Type ige:XamTextEditor}, ResourceId=EditorsDisabledForeground}}" />
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <!--#endregion-->

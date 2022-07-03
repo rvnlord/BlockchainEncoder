@@ -27,13 +27,25 @@ namespace WpfMyCompression.Source.Services
         private bool _isBlockchainSyncPaused = true;
         private LocalDbContext _db;
         private RPCClient _rpc;
-        private NetworkCredential _credentials;
+        private NetworkCredential _prevCredentials;
         private readonly List<DbRawBlock> _rawBlocksToAdd = new();
 
-        public NetworkCredential Credentials => _credentials ??= ConfigUtils.GetRPCNetworkCredential("Litecoin");
+        public NetworkCredential Credentials => ConfigUtils.GetRPCNetworkCredential("Litecoin");
         public LocalDbContext Db => _db ??= new LocalDbContext();
-        public RPCClient Rpc => _rpc ??= new RPCClient(Credentials, Credentials.Domain.ToUri(), Network.Main);
-        
+        public RPCClient Rpc
+        {
+            get
+            {
+                var currCredentials = Credentials;
+                if (currCredentials.Equals_(_prevCredentials)) 
+                    return _rpc;
+
+                _rpc = new RPCClient(Credentials, Credentials.Domain.ToUri(), Network.Main);
+                _prevCredentials = currCredentials;
+                return _rpc;
+            }
+        }
+
         public async Task<RawBlock> GetNextRawBlockAsync(DbRawBlock previousBlock)
         {
             var blockIndex = previousBlock == null ? 0 : (int)(previousBlock.Index + 1);
@@ -86,27 +98,32 @@ namespace WpfMyCompression.Source.Services
 
         public async Task<DbRawBlock> SyncRawBlockchain()
         {
-            if (!_isBlockchainSyncPaused)
-                throw new AccessViolationException("Blockchain is already syncing");
-
-            _pauseBlockchainSync = false;
-            _isBlockchainSyncPaused = false;
-
-            DbRawBlock nextBlock;
-            var lastBlock = await GetLastRawBlockAsync().ToDbRawBlock();
-
-            do
+            try
             {
-                nextBlock = await AddNextRawBlockAsync();
-                await OnRawBlockchainSyncStatusChangingAsync(nextBlock, lastBlock, "Syncing...");
-            } while (nextBlock.Index < lastBlock.Index && !_pauseBlockchainSync);
+                if (!_isBlockchainSyncPaused)
+                    throw new AccessViolationException("Blockchain is already syncing");
 
-            await InsertOrUpdateRawBlocksToDbAsync();
-            await OnRawBlockchainSyncStatusChangingAsync(nextBlock, lastBlock, _pauseBlockchainSync ? "Paused" : "Synced");
+                _pauseBlockchainSync = false;
+                _isBlockchainSyncPaused = false;
 
-            _isBlockchainSyncPaused = true;
-            
-            return nextBlock;
+                DbRawBlock nextBlock;
+                var lastBlock = await GetLastRawBlockAsync().ToDbRawBlock();
+
+                do
+                {
+                    nextBlock = await AddNextRawBlockAsync();
+                    await OnRawBlockchainSyncStatusChangingAsync(nextBlock, lastBlock, "Syncing...");
+                } while (nextBlock.Index < lastBlock.Index && !_pauseBlockchainSync);
+
+                await InsertOrUpdateRawBlocksToDbAsync();
+                await OnRawBlockchainSyncStatusChangingAsync(nextBlock, lastBlock, _pauseBlockchainSync ? "Paused" : "Synced");
+
+                return nextBlock;
+            }
+            finally
+            {
+                _isBlockchainSyncPaused = true;
+            }
         }
 
         public async Task PauseSyncingRawBlockchainAsync()

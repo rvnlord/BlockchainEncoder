@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -28,6 +29,7 @@ namespace WpfMyCompression.Source.Windows
         private CompressionEngine _ce;
         private string _sourceFIle;
         private CompressionConfigVM _configVM;
+        private string _configFilePath = "appsettings.json"; // by default setting app setting uses 'Entry Assembly' (which would be correct for 'ASP.NET' but here, not only we require 'Executing Assembly' but 'Entry Assembly' would get the file beefore copying to the app dir, so essentially the one that is not updated)
 
         public ILitecoinManager Lm => _lm ??= new LitecoinManager(); // `_configVM.LtcRpcCredentials` doesn't need to be passed directly since `appsettings` should always be current
         public CompressionEngine Ce => _ce ??= new CompressionEngine(_configVM.Batches, 0, 0, false);
@@ -84,13 +86,13 @@ namespace WpfMyCompression.Source.Windows
                     pwdLTCNodePassword.Password = _configVM.LtcRpcCredentials.Password; // PasswordBox is not bindable in WPF
                 }
                 
-                await ConfigUtils.SetAppSettingValueAsync("RPCs:Litecoin:Address", rpcAddress);
-                await ConfigUtils.SetAppSettingValueAsync("RPCs:Litecoin:User", _configVM.LtcRpcCredentials.UserName);
-                await ConfigUtils.SetAppSettingValueAsync("RPCs:Litecoin:Password", _configVM.LtcRpcCredentials.Password);
+                await ConfigUtils.SetAppSettingValueAsync("RPCs:Litecoin:Address", rpcAddress, _configFilePath);
+                await ConfigUtils.SetAppSettingValueAsync("RPCs:Litecoin:User", _configVM.LtcRpcCredentials.UserName, _configFilePath);
+                await ConfigUtils.SetAppSettingValueAsync("RPCs:Litecoin:Password", _configVM.LtcRpcCredentials.Password, _configFilePath);
             }
             else if (e.PropertyName == nameof(CompressionConfigVM.Batches))
             {
-                await ConfigUtils.SetAppSettingValueAsync("Compression:Batches", _configVM.Batches.ToString());
+                await ConfigUtils.SetAppSettingValueAsync("Compression:Batches", _configVM.Batches.ToString(), _configFilePath);
 
                 if (e.SetControlValue)
                     xneBatchesOfBytesAllocatedPerBlock.Value = _configVM.Batches;
@@ -111,7 +113,7 @@ namespace WpfMyCompression.Source.Windows
             if (!OperatingSystem.IsWindowsVersionAtLeast(7))
                 throw new PlatformNotSupportedException();
 
-            _configVM.LtcRpcCredentials.UserName = xteLTCNodeUser.Value?.ToString() ?? throw new NullReferenceException();
+            _configVM.LtcRpcCredentials.UserName = xteLTCNodeUser.Value?.ToString() ?? string.Empty;
             _configVM.NotifyPropertyChanged(nameof(_configVM.LtcRpcCredentials), false); 
         }
 

@@ -880,7 +880,7 @@
             <Rectangle x:Name="FocusedVisualElement" Stroke="{StaticResource ButtonPressedBorderBrush}" Visibility="Collapsed" StrokeThickness="2" />
             <Rectangle x:Name="DisabledVisualElement" Fill="{StaticResource DisabledVisualElement}" Visibility="Collapsed" />
               <ContentControl x:Name="contentControl" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" Margin="{TemplateBinding Padding}" Foreground="{TemplateBinding Foreground}" Focusable="False">
-              <ContentPresenter x:Name="contentPresenter" TextElement.Foreground="{Binding Path=(Foreground), RelativeSource={RelativeSource AncestorType=ContentControl}}" Focusable="False"/>
+              <ContentPresenter x:Name="contentPresenter" TextElement.Foreground="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=ContentControl}}" Focusable="False"/>
             </ContentControl>
           </Grid>
         </ControlTemplate>
