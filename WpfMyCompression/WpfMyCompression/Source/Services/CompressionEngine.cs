@@ -14,7 +14,7 @@ using WpfMyCompression.Source.DbContext.Models;
 
 namespace WpfMyCompression.Source.Services
 {
-    public class CompressionEngine
+    public class CompressionEngine : IEquatable<CompressionEngine>
     {
         private ILitecoinManager _lm;
         private readonly byte[][] _expandedBlockHashes = new byte[ByteUtils.MaxSizeStoredForBytes(2)][];
@@ -437,6 +437,30 @@ namespace WpfMyCompression.Source.Services
             public override string ToString() => FileOffset == 0 && FileSize == 0 && Layer == 0 
                 ? $"{Message}..."
                 : $"{Message} ({FileOffset.ToFileSizeString()} / {FileSize.ToFileSizeString()}: L{Layer})";
+        }
+
+        public override bool Equals(object o) => Equals(o as CompressionEngine);
+
+        public bool Equals(CompressionEngine y)
+        {
+            if (y is null) return false;
+            if (GetType() != y.GetType()) return false;
+            return _preloadHashesToMemory == y._preloadHashesToMemory && ChunkSize == y.ChunkSize && MaxLayers == y.MaxLayers && MinLayers == y.MinLayers;
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(_preloadHashesToMemory, ChunkSize, MaxLayers, MinLayers);
+        }
+
+        public static bool operator ==(CompressionEngine left, CompressionEngine right)
+        {
+            return Equals(left, right);
+        }
+
+        public static bool operator !=(CompressionEngine left, CompressionEngine right)
+        {
+            return !Equals(left, right);
         }
     }
 }

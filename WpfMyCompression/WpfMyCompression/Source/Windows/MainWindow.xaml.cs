@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -26,13 +25,28 @@ namespace WpfMyCompression.Source.Windows
     public partial class MainWindow
     {
         private ILitecoinManager _lm;
-        private CompressionEngine _ce;
+        private CompressionEngine _prevCe;
         private string _sourceFIle;
         private CompressionConfigVM _configVM;
-        private string _configFilePath = "appsettings.json"; // by default setting app setting uses 'Entry Assembly' (which would be correct for 'ASP.NET' but here, not only we require 'Executing Assembly' but 'Entry Assembly' would get the file beefore copying to the app dir, so essentially the one that is not updated)
+        private readonly string _configFilePath = "appsettings.json"; // by default setting app setting uses 'Entry Assembly' (which would be correct for 'ASP.NET' but here, not only we require 'Executing Assembly' but 'Entry Assembly' would get the file beefore copying to the app dir, so essentially the one that is not updated)
 
         public ILitecoinManager Lm => _lm ??= new LitecoinManager(); // `_configVM.LtcRpcCredentials` doesn't need to be passed directly since `appsettings` should always be current
-        public CompressionEngine Ce => _ce ??= new CompressionEngine(_configVM.Batches, 0, 0, false);
+        public CompressionEngine Ce
+        {
+            get
+            {
+                var ce = new CompressionEngine(_configVM.Batches, 0, 0, false);
+                if (ce.Equals(_prevCe))
+                    return ce;
+
+                if (_prevCe != null)
+                    _prevCe.CompressionStatusChanged -= CompressionEngine_CompressionStatusChanged;
+                ce.CompressionStatusChanged += CompressionEngine_CompressionStatusChanged;
+                _prevCe = ce;
+
+                return _prevCe;
+            }
+        }
 
         public MainWindow()
         {
@@ -65,8 +79,6 @@ namespace WpfMyCompression.Source.Windows
             if (!initialSyncStatus.IsSuccess)
                 lblOperation.Content = "Can't connect to the blockchain";
             
-            Ce.CompressionStatusChanged += CompressionEngine_CompressionStatusChanged;
-
             WpfAsyncUtils.HideLoader(gridMain);
         }
 
