@@ -84,7 +84,7 @@
                     Text="Select or drop a file..." 
                     FontSize="20"
                     Width="410" 
-                    IsReadOnly="True" 
+                    IsReadOnly="True"
                     FontStyle="Italic" 
                     TextWrapping="NoWrap" 
                     AllowDrop="True" 
