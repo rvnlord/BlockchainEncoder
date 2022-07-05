@@ -155,6 +155,8 @@ namespace WpfMyCompression.Source.Services
 
         private async Task<List<RawBlockchainMatch>> FindBestMatchesAsync(byte[] chunk, long offset, long previousLayerFileSize, int layer)
         {
+            // TODO: db table: index, blockIndex, 2bytesmatchIndex | find and save those indices into the file on every iteration
+
             var bestMatches = new List<RawBlockchainMatch>();
             var allBlockCount = await Lm.GetBlockCountAsync();
             var batches = chunk.Batch(2).Select(b => b.Pad(2).ToArray()).Pad(ChunkSize / 2).Select(b => b ?? new byte[2]).ToArray();
@@ -213,7 +215,7 @@ namespace WpfMyCompression.Source.Services
             if (blockIndex >= ByteUtils.MaxSizeStoredForBytes(2))
                 return;
 
-            var cachedHash = _expandedBlockHashes[blockIndex];
+            var cachedHash = _expandedBlockHashes.VorN(blockIndex);
             var hashSize = BitUtils.MaxSizeStoredForBits(12);
             if (cachedHash == null || cachedHash.Length != hashSize)
             {
@@ -373,7 +375,7 @@ namespace WpfMyCompression.Source.Services
             var varIntBlockIndexLength = compressedChunk.GetFirstVarIntLength(shift); // 5 + max 32 bits
             var blockOffsets = compressedChunk.ToBitArray<bool>().Skip(shift + varIntBlockIndexLength).Batch(12).Take(ChunkSize / 2).Select(bits => bits.ToInt()).ToArray();
             
-            var blockExpandedHash = _expandedBlockHashes[blockIndex] ?? await Lm.GetExpandedBlockHashFromDbByindexAsync(blockIndex);
+            var blockExpandedHash = _expandedBlockHashes.VorN(blockIndex) ?? await Lm.GetExpandedBlockHashFromDbByindexAsync(blockIndex);
 
             var decodedBytes = new List<byte>();
             foreach (var blockOffset in blockOffsets)
