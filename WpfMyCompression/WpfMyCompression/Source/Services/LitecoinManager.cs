@@ -168,6 +168,65 @@ namespace WpfMyCompression.Source.Services
             return block;
         }
 
+        public async Task<int> GetTwoByteMapsCountAsync() => await Db.TwoByteMaps.CountAsync();
+        public async Task ClearTwoByteMapsAsync()
+        {
+            await Db.TwoByteMaps.ClearAsync();
+            await Db.SaveChangesAsync();
+        }
+
+        public async Task<DbTwoBytesMap> AddTwoByteMapToDbAsync(DbTwoBytesMap twoByteMap)
+        {
+            await Db.TwoByteMaps.AddAsync(twoByteMap);
+            await Db.SaveChangesAsync();
+            return twoByteMap;
+        }
+
+        public async Task<DbTwoBytesMap> GetTwoByteMapByIndexAsync(int index)
+        {
+            var map = await Db.TwoByteMaps.SingleOrDefaultAsync(m => m.Index == index);
+            if (map != null)
+                await Db.Entry(map).Reference(e => e.Block).LoadAsync();
+            return map;
+        }
+
+        public async Task<DbTwoBytesMap> GetTwoByteMapByValueAsync(byte[] value)
+        {
+            return await Db.TwoByteMaps.SingleAsync(m => m.Value == value);
+        }
+
+        public async Task<DbTwoBytesMap> GetTwoByteMapByValueAsync(long blockId, int blockOffset)
+        {
+            var map = await Db.TwoByteMaps.SingleOrDefaultAsync(m => m.BlockId == blockId && m.IndexInBlock == blockOffset);
+            if (map != null)
+                await Db.Entry(map).Reference(e => e.Block).LoadAsync();
+            return map;
+        }
+
+        public async Task<DbTwoBytesMap[]> GetTwoByteMapsWithInvalidValueAsync()
+        {
+            return (await Db.TwoByteMaps.Include(m => m.Block).WhereAsync(m => m.Value == null)).ToArray();
+        }
+
+        public async Task<int[]> GetNonExistingTwoByteMapIndicesAsync()
+        {
+            return await Task.Run(() =>
+            {
+                var dbIndices = Db.TwoByteMaps.Select(m => m.Index).ToArray();
+                var allIndices = Enumerable.Range(0, ByteUtils.MaxNumberStoredForBytes(2)).ToArray();
+                var notExistingIndices = allIndices.Except(dbIndices).ToArray();
+                return notExistingIndices.ToArray();
+            });
+        }
+
+        public async Task<DbTwoBytesMap> SetTwoByteMapValueAsync(DbTwoBytesMap map, byte[] value)
+        {
+            var dbMap = await Db.TwoByteMaps.SingleAsync(m => m.Index == map.Index);
+            dbMap.Value = value;
+            await Db.SaveChangesAsync();
+            return dbMap;
+        }
+
         public event MyAsyncEventHandler<ILitecoinManager, RawBlockchainSyncStatusChangedEventArgs> RawBlockchainSyncStatusChanged;
 
         private async Task OnRawBlockchainSyncStatusChangingAsync(RawBlockchainSyncStatusChangedEventArgs e) => await RawBlockchainSyncStatusChanged.InvokeAsync(this, e);

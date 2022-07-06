@@ -23,11 +23,18 @@ namespace WpfMyCompression.Source.Services
         Task<byte[]> GetExpandedBlockHashFromDbByindexAsync(int index);
         Task<byte[]> AddExpandedBlockHashToDbByIndexAsync(int index, byte[] blockHash);
         Task<DbRawBlock[]> GetBlocksWithInvalidExpandedHashesAsync();
-        public Task<RawBlock> GetRawBlockByIndexAsync(int blockIndex);
-        public Task<DbRawBlock> AddRawBlockToDbAsync(DbRawBlock block);
-        public Task<DbRawBlock> AddRawBlockToDbByIndexAsync(int blockIndex);
-        
+        Task<RawBlock> GetRawBlockByIndexAsync(int blockIndex);
+        Task<DbRawBlock> AddRawBlockToDbAsync(DbRawBlock block);
+        Task<DbRawBlock> AddRawBlockToDbByIndexAsync(int blockIndex);
+        Task<int> GetTwoByteMapsCountAsync();
+        Task ClearTwoByteMapsAsync();
+        Task<DbTwoBytesMap> AddTwoByteMapToDbAsync(DbTwoBytesMap twoBytesMap);
+        Task<DbTwoBytesMap> GetTwoByteMapByIndexAsync(int index);
+        Task<DbTwoBytesMap> GetTwoByteMapByValueAsync(byte[] value);
+        Task<DbTwoBytesMap[]> GetTwoByteMapsWithInvalidValueAsync();
+        Task<int[]> GetNonExistingTwoByteMapIndicesAsync();
+        Task<DbTwoBytesMap> SetTwoByteMapValueAsync(DbTwoBytesMap map, byte[] value);
+
         event MyAsyncEventHandler<ILitecoinManager, LitecoinManager.RawBlockchainSyncStatusChangedEventArgs> RawBlockchainSyncStatusChanged;
-        
     }
 }

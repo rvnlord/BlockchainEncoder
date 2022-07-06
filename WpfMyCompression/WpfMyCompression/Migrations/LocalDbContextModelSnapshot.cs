@@ -33,17 +33,41 @@ namespace WpfMyCompression.Migrations
                     b.ToTable("RawBlocks", (string)null);
                 });
 
-            modelBuilder.Entity("WpfMyCompression.Source.DbContext.Models.KV", b =>
+            modelBuilder.Entity("WpfMyCompression.Source.DbContext.Models.DbTwoBytesMap", b =>
                 {
-                    b.Property<string>("Key")
-                        .HasColumnType("TEXT");
+                    b.Property<int>("Index")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<string>("Value")
-                        .HasColumnType("TEXT");
+                    b.Property<long>("BlockId")
+                        .HasColumnType("INTEGER");
 
-                    b.HasKey("Key");
+                    b.Property<int>("IndexInBlock")
+                        .HasColumnType("INTEGER");
 
-                    b.ToTable("KVs", (string)null);
+                    b.Property<byte[]>("Value")
+                        .HasColumnType("BLOB");
+
+                    b.HasKey("Index");
+
+                    b.HasIndex("BlockId");
+
+                    b.ToTable("TwoByteMaps", (string)null);
+                });
+
+            modelBuilder.Entity("WpfMyCompression.Source.DbContext.Models.DbTwoBytesMap", b =>
+                {
+                    b.HasOne("WpfMyCompression.Source.DbContext.Models.DbRawBlock", "Block")
+                        .WithMany("TwoByteMaps")
+                        .HasForeignKey("BlockId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Block");
+                });
+
+            modelBuilder.Entity("WpfMyCompression.Source.DbContext.Models.DbRawBlock", b =>
+                {
+                    b.Navigation("TwoByteMaps");
                 });
 #pragma warning restore 612, 618
         }

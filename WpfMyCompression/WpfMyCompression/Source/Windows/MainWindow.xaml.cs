@@ -37,7 +37,7 @@ namespace WpfMyCompression.Source.Windows
             {
                 var ce = new CompressionEngine(_configVM.Batches, 0, 0, false);
                 if (ce.Equals(_prevCe))
-                    return ce;
+                    return _prevCe;
 
                 if (_prevCe != null)
                     _prevCe.CompressionStatusChanged -= CompressionEngine_CompressionStatusChanged;
@@ -156,10 +156,16 @@ namespace WpfMyCompression.Source.Windows
 
         private async Task CompressionEngine_CompressionStatusChanged(CompressionEngine sender, CompressionEngine.CompressionStatusChangedEventArgs e, CancellationToken token)
         {
-            if (e.FileSize > 0)
-                pbStatus.Value = e.FileOffset == 0 ? 0 : (double)e.FileOffset / e.FileSize * 100;
-            lblOperation.Content = e.ToString();
-            await Task.CompletedTask;
+            await Dispatcher.Invoke(async () =>
+            {
+                if (e.FileSize > 0)
+                    pbStatus.Value = e.FileOffset == 0 ? 0 : (double)e.FileOffset / e.FileSize * 100;
+                else if (e.Percentage is >= 0 and <= 100)
+                    pbStatus.Value = (double) e.Percentage;
+
+                lblOperation.Content = e.ToString();
+                await Task.CompletedTask;
+            });
         }
 
         private async Task<ExceptionUtils.CaughtExceptionAndData<Exception, string>> CompressAsync()
