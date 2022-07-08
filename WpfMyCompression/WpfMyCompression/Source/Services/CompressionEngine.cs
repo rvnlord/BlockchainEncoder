@@ -414,7 +414,7 @@ namespace WpfMyCompression.Source.Services
         {
             var bits = new List<bool>();
             foreach (var m in matches)
-                bits.AddRange(m.ToVarInt(Endian.InheritFromHardware, 4, -1));
+                bits.AddRange(m.ToVarInt(Endian.InheritFromHardware, 4));
 
             _filePart.AddRange(bits);
 
