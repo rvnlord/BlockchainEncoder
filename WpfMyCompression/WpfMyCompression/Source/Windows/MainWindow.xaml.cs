@@ -58,25 +58,6 @@ namespace WpfMyCompression.Source.Windows
         
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            // TEST
-            var n = 8100;
-            var vi1 = n.ToVarInt().BitArrayToByteArray();
-            var vi1L = vi1.GetFirstVarIntLength();
-            var i1 = vi1.GetFirstVarInt();
-
-            var vi2 = n.ToVarInt(4).BitArrayToByteArray();
-            var vi2L = vi2.GetFirstVarIntLength(0, 4);
-            var i2 = vi2.GetFirstVarInt(0, 4);
-
-            var vi3 = n.ToVarInt(4, 3).BitArrayToByteArray();
-            var vi3L = vi3.GetFirstVarIntLength(0, 4, 3);
-            var i3 = vi3.GetFirstVarInt(0, 4, 3);
-
-            var vi4 = Enumerable.Repeat(false, 7).Concat(n.ToVarInt(4, 3)).BitArrayToByteArray();
-            var vi4L = vi4.GetFirstVarIntLength(7, 4, 3);
-            var i4 = vi4.GetFirstVarInt(7, 4, 3);
-            // ===
-
             if (!OperatingSystem.IsWindowsVersionAtLeast(7))
                 throw new PlatformNotSupportedException();
             
